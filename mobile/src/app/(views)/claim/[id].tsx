@@ -162,7 +162,7 @@ export default function ClaimDetailScreen() {
           />
           <Text style={[styles.statusTitle, isCompleted && { color: '#065f46' }, (isCancelled || isExpired) && { color: '#991b1b' }]}>{order.status}</Text>
           <Text style={[styles.statusDesc, isCompleted && { color: '#047857' }, (isCancelled || isExpired) && { color: '#b91c1c' }]}>
-            {isCompleted ? "You have successfully picked up this donation!" : (isCancelled ? "This claim was cancelled." : (isExpired ? "This claim has expired because the pickup window ended." : "Your claim has been secured. Please pick up the items."))}
+            {isCompleted ? "You have successfully picked up this donation!" : (isCancelled ? `This claim was cancelled by ${order.cancelled_by_details?.role === 'donor' ? 'the donor' : 'you'}.` : (isExpired ? "This claim has expired because the pickup window ended." : "Your claim has been secured. Please pick up the items."))}
           </Text>
         </View>
 

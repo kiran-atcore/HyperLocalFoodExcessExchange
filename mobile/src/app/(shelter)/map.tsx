@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
+import EtaSelectionModal from '../../components/EtaSelectionModal';
 
 export default function ShelterMapScreen() {
   const [donations, setDonations] = useState<any[]>([]);
@@ -15,6 +16,7 @@ export default function ShelterMapScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
   const webViewRef = useRef<WebView>(null);
 
   useFocusEffect(
@@ -60,9 +62,21 @@ export default function ShelterMapScreen() {
     }
   };
 
-  const handleClaimFromMap = async (id: number) => {
+  const handleClaimPress = (id: number) => {
+    const listing = donations.find(d => d.id === id);
+    if (listing) {
+      setEtaModalListing(listing);
+    }
+  };
+
+  const submitClaim = async (etaMins: number) => {
+    if (!etaModalListing) return;
+    const id = etaModalListing.id;
+    setEtaModalListing(null);
+
     try {
-      const response = await api.post('/orders/', { listing: id });
+      const eta = new Date(Date.now() + etaMins * 60000).toISOString();
+      const response = await api.post('/orders/', { listing: id, eta });
       Alert.alert("Success", "Donation successfully claimed!");
       fetchDonations(); // refresh map data
       router.push(`/(views)/claim/${response.data.id}` as any);
@@ -75,7 +89,7 @@ export default function ShelterMapScreen() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'claim' && data.id) {
-        handleClaimFromMap(data.id);
+        handleClaimPress(data.id);
       }
     } catch (e) {
       console.error('Failed to parse webview message', e);
@@ -254,6 +268,15 @@ export default function ShelterMapScreen() {
           javaScriptEnabled={true}
           domStorageEnabled={true}
           onMessage={handleWebViewMessage}
+        />
+      )}
+
+      {etaModalListing && (
+        <EtaSelectionModal 
+          visible={!!etaModalListing} 
+          onClose={() => setEtaModalListing(null)} 
+          onConfirm={submitClaim} 
+          pickupEnd={etaModalListing.pickup_end}
         />
       )}
     </SafeAreaView>

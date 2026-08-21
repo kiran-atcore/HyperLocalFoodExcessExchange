@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import api from '../../utils/api';
 
@@ -12,6 +12,13 @@ export default function DonorScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [permission, requestPermission] = useCameraPermissions();
+
+  useFocusEffect(
+    useCallback(() => {
+      setScanned(false);
+      setIsScanning(false);
+    }, [])
+  );
 
   if (!permission) return <View style={styles.container} />;
   
@@ -42,15 +49,7 @@ export default function DonorScanScreen() {
     setIsScanning(true);
     try {
       const response = await api.post(`/orders/complete_qr/`, { qr_code_id: targetOrderId });
-      Alert.alert(
-        "Scan Successful",
-        `Consumer verified! Order #${response.data.order_id} has been marked as picked up.`,
-        [
-          { text: "Done", onPress: () => {
-            router.back();
-          }}
-        ]
-      );
+      router.push(`/(views)/success/${response.data.order_id}` as any);
     } catch (e: any) {
       let errorMsg = "Could not verify QR code. Please ensure this is a valid pickup code.";
       if (e.response?.status === 404) {
@@ -64,46 +63,16 @@ export default function DonorScanScreen() {
       Alert.alert(
         "Scan Failed", 
         errorMsg,
-        [{ text: "Try Again", onPress: () => setScanned(false) }]
-      );
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
-  const simulateScan = async () => {
-    if (!order_id) {
-      Alert.alert("Error", "No order selected to scan.");
-      return;
-    }
-    
-    setIsScanning(true);
-    try {
-      await api.patch(`/orders/${order_id}/complete/`);
-      Alert.alert(
-        "Scan Successful",
-        `Consumer verified! Order #${order_id} has been marked as picked up.`,
         [
-          { text: "Done", onPress: () => {
-            router.back();
-          }}
+          { text: "Cancel", style: "cancel", onPress: () => router.replace('/(donor)') },
+          { text: "Try Again", onPress: () => setScanned(false) }
         ]
       );
-    } catch (e: any) {
-      let errorMsg = "Could not verify QR code. Please ensure this is a valid pickup code.";
-      if (e.response?.status === 404) {
-        errorMsg = "Invalid or unrecognized QR code. This order could not be found.";
-      } else if (e.response?.data?.error) {
-        errorMsg = e.response.data.error;
-      } else if (e.response?.data?.detail) {
-        errorMsg = e.response.data.detail;
-      }
-
-      Alert.alert("Scan Failed", errorMsg);
     } finally {
       setIsScanning(false);
     }
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,11 +108,7 @@ export default function DonorScanScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={[styles.simulateBtn, isScanning && { opacity: 0.7 }]} onPress={simulateScan} disabled={isScanning}>
-          <Text style={styles.simulateBtnText}>{isScanning ? 'Processing...' : `Simulate Scan Success (Order #${order_id || '?'})`}</Text>
-        </TouchableOpacity>
-      </View>
+
     </SafeAreaView>
   );
 }
@@ -172,8 +137,6 @@ const styles = StyleSheet.create({
   bottomRight: { bottom: -2, right: -2, borderBottomWidth: 4, borderRightWidth: 4 },
   
   instructions: { color: '#94a3b8', fontSize: 15, textAlign: 'center', lineHeight: 22, paddingHorizontal: 20 },
-  
-  footer: { padding: 32, paddingBottom: 48 },
-  simulateBtn: { backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
+  simulateBtn: { backgroundColor: '#10b981', paddingVertical: 16, borderRadius: 12, alignItems: 'center', margin: 20 },
   simulateBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
 });

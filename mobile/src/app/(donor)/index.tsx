@@ -19,7 +19,8 @@ export default function DonorDashboardScreen() {
   const fetchListings = async () => {
     try {
       const response = await api.get('/listings/?mine=true');
-      setListings(response.data);
+      const activeOnly = response.data.filter((item: any) => item.donor_status !== 'Picked Up');
+      setListings(activeOnly);
     } catch (error) {
       console.error("Failed to fetch listings", error);
     } finally {
@@ -55,7 +56,7 @@ export default function DonorDashboardScreen() {
       <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/surplus/${item.id}` as any)}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.price}>{item.listing_type === 'DONATION' ? 'FREE' : `$${item.discounted_price}`}</Text>
+          <Text style={styles.price}>{item.listing_type === 'DONATION' ? 'FREE' : `₹${item.discounted_price}`}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <View style={[

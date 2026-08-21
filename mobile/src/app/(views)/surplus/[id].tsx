@@ -116,7 +116,7 @@ export default function SurplusDetailScreen() {
           <Text style={styles.title}>{listing.title}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>
-              {listing.listing_type === 'DONATION' ? 'FREE' : `$${listing.discounted_price} (DISCOUNT)`}
+              {listing.listing_type === 'DONATION' ? 'FREE' : `₹${listing.discounted_price} (DISCOUNT)`}
             </Text>
           </View>
         </View>
@@ -169,7 +169,7 @@ export default function SurplusDetailScreen() {
               <View key={o.id} style={styles.orderCard}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b', marginBottom: 4 }}>
-                    Shelter ID: {o.requester}
+                    Shelter: {o.requester_details?.name || `ID ${o.requester}`}
                   </Text>
                   <Text style={{ color: '#64748b', fontSize: 14 }}>
                     Status: <Text style={{ fontWeight: 'bold', color: o.status === 'PICKED_UP' ? '#10b981' : ((o.status === 'CANCELLED' || o.status === 'EXPIRED') ? '#ef4444' : '#f59e0b') }}>{o.status}</Text>

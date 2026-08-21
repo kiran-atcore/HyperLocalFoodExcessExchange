@@ -15,6 +15,9 @@ class FoodListing(models.Model):
     discounted_price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
     estimated_fmv = models.DecimalField(max_digits=6, decimal_places=2, help_text="Fair Market Value for Tax Receipt")
     
+    is_ai_flagged = models.BooleanField(default=False)
+    ai_suggested_value = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    
     quantity_available = models.PositiveIntegerField(default=1)
     quantity_unit = models.CharField(max_length=20, default='portions')
     dietary_info = models.CharField(max_length=50, default='None')

@@ -5,6 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
 import CountdownTimer from '../../components/CountdownTimer';
+import EtaSelectionModal from '../../components/EtaSelectionModal';
 
 export default function ShelterFeedScreen() {
   const [feed, setFeed] = useState<any[]>([]);
@@ -12,6 +13,7 @@ export default function ShelterFeedScreen() {
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [isLocationReady, setIsLocationReady] = useState(false);
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
@@ -73,10 +75,20 @@ export default function ShelterFeedScreen() {
     return d < 1 ? '< 1 km' : `${d.toFixed(1)} km`;
   };
 
-  const handleClaim = async (id: number) => {
+  const handleClaimPress = (item: any) => {
+    setEtaModalListing(item);
+  };
+
+  const submitClaim = async (etaMins: number) => {
+    if (!etaModalListing) return;
+    
+    const id = etaModalListing.id;
+    setEtaModalListing(null);
     setClaimingId(id);
+    
     try {
-      const response = await api.post('/orders/', { listing: id });
+      const eta = new Date(Date.now() + etaMins * 60000).toISOString();
+      const response = await api.post('/orders/', { listing: id, eta });
       alert("Success! You have claimed this donation.");
       router.push(`/(views)/claim/${response.data.id}` as any);
     } catch (e: any) {
@@ -109,7 +121,7 @@ export default function ShelterFeedScreen() {
           <Text style={styles.time}>{item.quantity_available} {item.quantity_unit || 'portions'}</Text>
           <TouchableOpacity 
             style={[styles.button, (claimingId === item.id || item.is_claimed) && { opacity: 0.7, backgroundColor: item.is_claimed ? '#94a3b8' : '#3b82f6' }]} 
-            onPress={() => handleClaim(item.id)} 
+            onPress={() => handleClaimPress(item)} 
             disabled={claimingId === item.id || item.is_claimed}
           >
             {claimingId === item.id ? (
@@ -144,6 +156,15 @@ export default function ShelterFeedScreen() {
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={{ paddingBottom: 100 }}
           ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No priority donations available right now.</Text>}
+        />
+      )}
+
+      {etaModalListing && (
+        <EtaSelectionModal 
+          visible={!!etaModalListing} 
+          onClose={() => setEtaModalListing(null)} 
+          onConfirm={submitClaim} 
+          pickupEnd={etaModalListing.pickup_end}
         />
       )}
     </SafeAreaView>

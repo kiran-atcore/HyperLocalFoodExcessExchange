@@ -47,7 +47,7 @@ export default function DealsViewScreen() {
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>Assorted Pastries (Deal #{id})</Text>
-          <Text style={styles.badge}>$4.50</Text>
+          <Text style={styles.badge}>₹4.50</Text>
         </View>
         <Text style={styles.vendor}>Sunrise Bakery • 1.2 km away</Text>
         
@@ -58,7 +58,7 @@ export default function DealsViewScreen() {
         
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Original Price:</Text>
-          <Text style={styles.infoValueStrike}>$12.00</Text>
+          <Text style={styles.infoValueStrike}>₹12.00</Text>
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Pickup Time:</Text>
@@ -86,7 +86,7 @@ export default function DealsViewScreen() {
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.reserveButton} onPress={() => router.push(`/(views)/receipt/${id}` as any)}>
-          <Text style={styles.reserveButtonText}>Buy Now ($4.50)</Text>
+          <Text style={styles.reserveButtonText}>Buy Now (₹4.50)</Text>
         </TouchableOpacity>
       </View>
       </ScrollView>

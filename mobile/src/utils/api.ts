@@ -2,8 +2,8 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 const api = axios.create({
-  // Use your computer's local IP address so physical devices and emulators can reach the backend
-  baseURL: 'http://10.59.162.203:8000/api',
+  // Use 10.0.2.2 for Android Emulator, or your local IP for physical devices
+  baseURL: 'http://10.0.2.2:8000/api',
 });
 
 api.interceptors.request.use(async (config) => {

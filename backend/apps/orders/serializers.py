@@ -12,14 +12,14 @@ class SimpleListingSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = FoodListing
-        fields = ['id', 'title', 'listing_type', 'quantity_available', 'quantity_unit', 'latitude', 'longitude', 'donor_name', 'pickup_end', 'donor_latitude', 'donor_longitude']
+        fields = ['id', 'title', 'listing_type', 'quantity_available', 'quantity_unit', 'latitude', 'longitude', 'donor_name', 'pickup_end', 'donor_latitude', 'donor_longitude', 'estimated_fmv']
 
 class SimpleUserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'role']
+        fields = ['id', 'name', 'role', 'email']
         
     def get_name(self, obj):
         return obj.business_name if obj.business_name else obj.username

@@ -38,7 +38,7 @@ export default function DonorTaxScreen() {
         
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total Estimated Value</Text>
-          <Text style={styles.summaryValue}>${totalValue}</Text>
+          <Text style={styles.summaryValue}>₹{totalValue}</Text>
           <Text style={styles.summaryYear}>{new Date().getFullYear()} Tax Year</Text>
         </View>
 
@@ -58,7 +58,7 @@ export default function DonorTaxScreen() {
             <View key={receipt.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.date}>{new Date(receipt.created_at).toLocaleDateString()}</Text>
-                <Text style={styles.value}>${receipt.estimated_value}</Text>
+                <Text style={styles.value}>₹{receipt.estimated_value}</Text>
               </View>
               <Text style={styles.item}>{receipt.listing_title}</Text>
               <Text style={styles.ngo}>To: {receipt.ngo_name}</Text>

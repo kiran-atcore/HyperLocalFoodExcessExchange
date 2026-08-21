@@ -191,12 +191,12 @@ export default function EditSurplusScreen() {
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: isDonation ? 0 : 8 }]}>
-                <Text style={styles.label}>Est. Value ($) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
+                <Text style={styles.label}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
                 <TextInput style={styles.input} placeholder="0.00" keyboardType="decimal-pad" value={originalPrice} onChangeText={setOriginalPrice} />
               </View>
               {!isDonation && (
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.label}>Discount Price ($)</Text>
+                  <Text style={styles.label}>Discount Price (₹)</Text>
                   <TextInput style={[styles.input, { borderColor: '#10b981', borderWidth: 2 }]} placeholder="0.00" keyboardType="decimal-pad" value={discountPrice} onChangeText={setDiscountPrice} />
                 </View>
               )}

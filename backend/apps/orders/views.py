@@ -60,8 +60,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.listing.donor != request.user:
             return Response({'error': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
             
+        from django.utils import timezone
+        
+        if order.status not in [OrderStatus.PICKED_UP, OrderStatus.CANCELLED, OrderStatus.EXPIRED]:
+            if order.listing.pickup_end and order.listing.pickup_end <= timezone.now():
+                order.status = OrderStatus.EXPIRED
+                order.save()
+                
+        if order.status == OrderStatus.EXPIRED:
+            return Response({'error': 'This claim has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+            
         if order.status == OrderStatus.PICKED_UP:
             return Response({'error': 'Already picked up.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if order.status == OrderStatus.CANCELLED:
+            return Response({'error': 'This claim was cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
 
         order.status = OrderStatus.PICKED_UP
         order.save()
@@ -94,14 +107,21 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.listing.donor != request.user:
             return Response({'error': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
             
+        from django.utils import timezone
+        
+        if order.status not in [OrderStatus.PICKED_UP, OrderStatus.CANCELLED, OrderStatus.EXPIRED]:
+            if order.listing.pickup_end and order.listing.pickup_end <= timezone.now():
+                order.status = OrderStatus.EXPIRED
+                order.save()
+                
+        if order.status == OrderStatus.EXPIRED:
+            return Response({'error': 'This claim has expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
         if order.status == OrderStatus.PICKED_UP:
             return Response({'error': 'Already picked up.'}, status=status.HTTP_400_BAD_REQUEST)
             
         if order.status == OrderStatus.CANCELLED:
             return Response({'error': 'This claim was cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        if order.status == OrderStatus.EXPIRED:
-            return Response({'error': 'This claim has expired.'}, status=status.HTTP_400_BAD_REQUEST)
 
         order.status = OrderStatus.PICKED_UP
         order.save()

@@ -28,7 +28,7 @@ export default function ShelterProfileScreen() {
       setProfile(userRes.data);
       
       const orders = ordersRes.data;
-      const active = orders.filter((o: any) => o.status !== 'PICKED_UP' && o.status !== 'CANCELLED').length;
+      const active = orders.filter((o: any) => o.status === 'PENDING' || o.status === 'APPROVED').length;
       const completed = orders.filter((o: any) => o.status === 'PICKED_UP').length;
       setStats({ active, completed });
     } catch (e) {

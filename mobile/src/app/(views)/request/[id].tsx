@@ -1,11 +1,77 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import api from '../../../utils/api';
+import CountdownTimer from '../../../components/CountdownTimer';
 
 export default function RequestDetailScreen() {
   const { id } = useLocalSearchParams();
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchOrder();
+  }, [id]);
+
+  const fetchOrder = async () => {
+    try {
+      const response = await api.get(`/orders/${id}/`);
+      setOrder(response.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = () => {
+    Alert.alert(
+      "Cancel Request",
+      "Are you sure you want to cancel this request?",
+      [
+        { text: "Keep Request", style: "cancel" },
+        { 
+          text: "Cancel", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.patch(`/orders/${id}/cancel/`);
+              Alert.alert("Cancelled", "The request was cancelled.");
+              router.back();
+            } catch (error) {
+              Alert.alert("Error", "Failed to cancel request.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleAutoExpire = async () => {
+    if (order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && order.status !== 'EXPIRED') {
+      try {
+        await api.patch(`/orders/${id}/expire/`);
+      } catch (e) {
+        console.error("Auto expire failed", e);
+      }
+      setOrder({ ...order, status: 'EXPIRED' });
+      Alert.alert("Expired", "This claim has expired.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!order) return null;
+
+  const isShelter = order.requester_details?.role === 'shelter';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -20,12 +86,12 @@ export default function RequestDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         
         <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={32} color="#94a3b8" />
+          <View style={[styles.avatar, { backgroundColor: isShelter ? '#eff6ff' : '#ecfdf5' }]}>
+            <Ionicons name={isShelter ? "business" : "person"} size={32} color={isShelter ? "#3b82f6" : "#10b981"} />
           </View>
-          <Text style={styles.name}>John Doe</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>CONSUMER</Text>
+          <Text style={styles.name}>{order.requester_details?.name || `ID: ${order.requester}`}</Text>
+          <View style={[styles.badge, { backgroundColor: isShelter ? '#eff6ff' : '#ecfdf5' }]}>
+            <Text style={[styles.badgeText, { color: isShelter ? '#2563eb' : '#059669' }]}>{order.requester_details?.role?.toUpperCase() || 'UNKNOWN'}</Text>
           </View>
         </View>
 
@@ -33,26 +99,38 @@ export default function RequestDetailScreen() {
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Item:</Text>
-            <Text style={styles.infoValue}>Assorted Pastries (x2)</Text>
+            <Text style={styles.infoValue}>{order.listing_details?.title}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Estimated Arrival:</Text>
-            <Text style={styles.infoValueTime}>5:15 PM</Text>
+            <Text style={styles.infoValueTime}>{order.eta ? new Date(order.eta).toLocaleTimeString() : 'No ETA'}</Text>
           </View>
-          <View style={[styles.infoRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Status:</Text>
-            <Text style={styles.infoValuePending}>En Route</Text>
+            <Text style={styles.infoValuePending}>{order.status}</Text>
           </View>
+          {order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && order.status !== 'EXPIRED' && order.listing_details?.pickup_end && (
+            <View style={[styles.infoRow, { borderBottomWidth: 0, paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start' }]}>
+              <Text style={[styles.infoLabel, { marginBottom: 4 }]}>Expires In:</Text>
+              <Text style={{ fontSize: 16, color: '#ef4444', fontWeight: 'bold' }}>
+                <CountdownTimer targetDate={order.listing_details.pickup_end} onExpire={handleAutoExpire} />
+              </Text>
+            </View>
+          )}
         </View>
 
-        <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/(donor)/scan' as any)}>
-          <Ionicons name="qr-code-outline" size={24} color="#fff" style={{ marginRight: 12 }} />
-          <Text style={styles.scanBtnText}>Open Scanner to Verify</Text>
-        </TouchableOpacity>
+        {order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && order.status !== 'EXPIRED' && (
+          <TouchableOpacity style={styles.scanBtn} onPress={() => router.push({ pathname: '/(donor)/scan', params: { order_id: order.id } })}>
+            <Ionicons name="qr-code-outline" size={24} color="#fff" style={{ marginRight: 12 }} />
+            <Text style={styles.scanBtnText}>Open Scanner to Verify</Text>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity style={styles.cancelBtn}>
-          <Text style={styles.cancelBtnText}>Cancel Request</Text>
-        </TouchableOpacity>
+        {order.status !== 'PICKED_UP' && order.status !== 'CANCELLED' && order.status !== 'EXPIRED' && (
+          <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelOrder}>
+            <Text style={styles.cancelBtnText}>Cancel Request</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
     </SafeAreaView>

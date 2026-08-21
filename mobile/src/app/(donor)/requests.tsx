@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
+import CountdownTimer from '../../components/CountdownTimer';
 
 export default function DonorRequestsScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -19,7 +20,7 @@ export default function DonorRequestsScreen() {
     try {
       setLoading(true);
       const response = await api.get('/orders/');
-      // Filter out picked up or cancelled orders
+      // Filter out picked up or cancelled/expired orders
       const activeOrders = response.data.filter((o: any) => o.status === 'PENDING' || o.status === 'APPROVED');
       setOrders(activeOrders);
     } catch (e) {
@@ -28,10 +29,19 @@ export default function DonorRequestsScreen() {
       setLoading(false);
     }
   };
+  const handleAutoExpire = async (orderId: number) => {
+    setOrders(prev => prev.filter(c => c.id !== orderId));
+    try {
+      await api.patch(`/orders/${orderId}/expire/`);
+    } catch (e) {
+      console.error("Auto cancel failed", e);
+    }
+  };
+
   const renderItem = ({ item }: any) => {
     const isShelter = item.requester_details?.role === 'shelter';
     return (
-      <TouchableOpacity style={[styles.card, { borderLeftColor: isShelter ? '#3b82f6' : '#10b981' }]} onPress={() => router.push({ pathname: '/(donor)/scan', params: { order_id: item.id } })}>
+      <TouchableOpacity style={[styles.card, { borderLeftColor: isShelter ? '#3b82f6' : '#10b981' }]} onPress={() => router.push(`/(views)/request/${item.id}` as any)}>
         <View style={styles.headerRow}>
           <View style={styles.userCol}>
             <Text style={styles.name}>{item.requester_details?.name}</Text>
@@ -44,7 +54,14 @@ export default function DonorRequestsScreen() {
           <Ionicons name="time-outline" size={20} color="#f59e0b" />
         </View>
         <Text style={styles.itemText}>{item.listing_details?.title}</Text>
-        <Text style={styles.timeText}>{item.eta ? `ETA: ${new Date(item.eta).toLocaleTimeString()}` : 'No ETA Provided'}</Text>
+        <View style={styles.footerRow}>
+          <Text style={styles.timeText}>{item.eta ? `ETA: ${new Date(item.eta).toLocaleTimeString()}` : 'No ETA Provided'}</Text>
+          {item.listing_details?.pickup_end && (
+            <Text style={{ fontSize: 12, color: '#ef4444', fontWeight: 'bold' }}>
+              Expires in: <CountdownTimer targetDate={item.listing_details.pickup_end} onExpire={() => handleAutoExpire(item.id)} />
+            </Text>
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -79,5 +96,6 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   badgeText: { fontSize: 10, fontWeight: 'bold' },
   itemText: { fontSize: 16, color: '#475569', marginBottom: 8 },
+  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   timeText: { fontSize: 14, fontWeight: 'bold', color: '#f59e0b' }
 });

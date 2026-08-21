@@ -5,6 +5,7 @@ import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../../utils/api';
 import CountdownTimer from '../../../components/CountdownTimer';
+import EtaSelectionModal from '../../../components/EtaSelectionModal';
 
 export default function DonationViewScreen() {
   const { id, distance } = useLocalSearchParams();
@@ -12,6 +13,7 @@ export default function DonationViewScreen() {
   const [loading, setLoading] = useState(true);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
+  const [isEtaModalVisible, setIsEtaModalVisible] = useState(false);
 
   useEffect(() => {
     fetchListing();
@@ -31,10 +33,16 @@ export default function DonationViewScreen() {
     }
   };
 
-  const handleClaim = async () => {
+  const handleClaimPress = () => {
+    setIsEtaModalVisible(true);
+  };
+
+  const submitClaim = async (etaMins: number) => {
+    setIsEtaModalVisible(false);
     setIsClaiming(true);
     try {
-      const response = await api.post('/orders/', { listing: id });
+      const eta = new Date(Date.now() + etaMins * 60000).toISOString();
+      const response = await api.post('/orders/', { listing: id, eta });
       Alert.alert("Success", "Donation successfully claimed!");
       router.replace(`/(views)/claim/${response.data.id}` as any);
     } catch (e: any) {
@@ -94,7 +102,7 @@ export default function DonationViewScreen() {
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>{listing.title}</Text>
-          <Text style={styles.badge}>{listing.listing_type === 'DONATION' ? 'FREE' : `$${listing.discounted_price}`}</Text>
+          <Text style={styles.badge}>{listing.listing_type === 'DONATION' ? 'FREE' : `₹${listing.discounted_price}`}</Text>
         </View>
         <Text style={styles.vendor}>{listing.donor_name || 'Donor'} • {distance || 'Distance unknown'}</Text>
         
@@ -105,7 +113,7 @@ export default function DonationViewScreen() {
         
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Estimated Value:</Text>
-          <Text style={styles.infoValue}>${listing.estimated_fmv || '0.00'}</Text>
+          <Text style={styles.infoValue}>₹{listing.estimated_fmv || '0.00'}</Text>
         </View>
         <View style={[styles.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 6 }]}>
           <Text style={styles.infoLabel}>Expiration Date:</Text>
@@ -150,7 +158,7 @@ export default function DonationViewScreen() {
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.reserveButton, (listing.is_claimed || isExpired) && { backgroundColor: '#94a3b8' }]} 
-          onPress={handleClaim} 
+          onPress={handleClaimPress} 
           disabled={isClaiming || listing.is_claimed || isExpired}
         >
           <Text style={styles.reserveButtonText}>
@@ -159,6 +167,15 @@ export default function DonationViewScreen() {
         </TouchableOpacity>
       </View>
       </ScrollView>
+
+      {listing.pickup_end && (
+        <EtaSelectionModal 
+          visible={isEtaModalVisible} 
+          onClose={() => setIsEtaModalVisible(false)} 
+          onConfirm={submitClaim} 
+          pickupEnd={listing.pickup_end}
+        />
+      )}
     </SafeAreaView>
   );
 }

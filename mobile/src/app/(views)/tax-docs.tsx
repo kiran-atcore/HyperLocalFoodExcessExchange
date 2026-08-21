@@ -22,8 +22,8 @@ export default function TaxDocsScreen() {
           <View style={styles.statusIconBg}>
             <Ionicons name="shield-checkmark" size={32} color="#10b981" />
           </View>
-          <Text style={styles.statusTitle}>501(c)(3) Verified</Text>
-          <Text style={styles.statusDesc}>Your organization is fully verified to receive tax-deductible bulk donations.</Text>
+          <Text style={styles.statusTitle}>Section 80G Verified</Text>
+          <Text style={styles.statusDesc}>Your organization is fully verified under Section 80G to receive tax-deductible bulk donations in India.</Text>
         </View>
 
         <Text style={styles.sectionHeader}>Uploaded Documents</Text>
@@ -34,7 +34,7 @@ export default function TaxDocsScreen() {
             <Ionicons name="document-text" size={24} color="#3b82f6" />
           </View>
           <View style={styles.docInfo}>
-            <Text style={styles.docTitle}>IRS Determination Letter.pdf</Text>
+            <Text style={styles.docTitle}>80G Approval Certificate.pdf</Text>
             <Text style={styles.docMeta}>Uploaded: Jan 12, 2024 • 1.2 MB</Text>
           </View>
           <TouchableOpacity style={styles.docAction}>
@@ -47,7 +47,7 @@ export default function TaxDocsScreen() {
             <Ionicons name="document-text" size={24} color="#3b82f6" />
           </View>
           <View style={styles.docInfo}>
-            <Text style={styles.docTitle}>State Exemption Form.pdf</Text>
+            <Text style={styles.docTitle}>12A Registration Certificate.pdf</Text>
             <Text style={styles.docMeta}>Uploaded: Jan 12, 2024 • 0.8 MB</Text>
           </View>
           <TouchableOpacity style={styles.docAction}>
