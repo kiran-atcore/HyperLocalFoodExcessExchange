@@ -2,23 +2,107 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import api from '../../utils/api';
 
 export default function DonorScanScreen() {
-  const [isScanning, setIsScanning] = useState(true);
+  const { order_id } = useLocalSearchParams();
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [facing, setFacing] = useState<"front" | "back">("back");
+  const [permission, requestPermission] = useCameraPermissions();
 
-  const simulateScan = () => {
-    setIsScanning(false);
-    Alert.alert(
-      "Scan Successful",
-      "Consumer verified! Order #1234 has been marked as picked up.",
-      [
-        { text: "Done", onPress: () => {
-          setIsScanning(true);
-          router.replace('/(donor)');
-        }}
-      ]
+  if (!permission) return <View style={styles.container} />;
+  
+  if (!permission.granted) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ textAlign: 'center', color: 'white', marginBottom: 20 }}>We need your permission to show the camera</Text>
+        <TouchableOpacity style={styles.simulateBtn} onPress={requestPermission}>
+          <Text style={styles.simulateBtnText}>Grant Permission</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
     );
+  }
+
+  const handleBarCodeScanned = async ({ type, data }: any) => {
+    setScanned(true);
+    // Parse the QR code data. If it starts with "claim:", extract the ID.
+    let targetOrderId = order_id || data;
+    if (typeof targetOrderId === 'string' && targetOrderId.startsWith('claim:')) {
+      targetOrderId = targetOrderId.split(':')[1];
+    }
+
+    if (!targetOrderId) {
+      Alert.alert("Error", "No valid order ID found.", [{ text: "OK", onPress: () => setScanned(false) }]);
+      return;
+    }
+    
+    setIsScanning(true);
+    try {
+      const response = await api.post(`/orders/complete_qr/`, { qr_code_id: targetOrderId });
+      Alert.alert(
+        "Scan Successful",
+        `Consumer verified! Order #${response.data.order_id} has been marked as picked up.`,
+        [
+          { text: "Done", onPress: () => {
+            router.back();
+          }}
+        ]
+      );
+    } catch (e: any) {
+      let errorMsg = "Could not verify QR code. Please ensure this is a valid pickup code.";
+      if (e.response?.status === 404) {
+        errorMsg = "Invalid or unrecognized QR code. This order could not be found.";
+      } else if (e.response?.data?.error) {
+        errorMsg = e.response.data.error;
+      } else if (e.response?.data?.detail) {
+        errorMsg = e.response.data.detail;
+      }
+
+      Alert.alert(
+        "Scan Failed", 
+        errorMsg,
+        [{ text: "Try Again", onPress: () => setScanned(false) }]
+      );
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const simulateScan = async () => {
+    if (!order_id) {
+      Alert.alert("Error", "No order selected to scan.");
+      return;
+    }
+    
+    setIsScanning(true);
+    try {
+      await api.patch(`/orders/${order_id}/complete/`);
+      Alert.alert(
+        "Scan Successful",
+        `Consumer verified! Order #${order_id} has been marked as picked up.`,
+        [
+          { text: "Done", onPress: () => {
+            router.back();
+          }}
+        ]
+      );
+    } catch (e: any) {
+      let errorMsg = "Could not verify QR code. Please ensure this is a valid pickup code.";
+      if (e.response?.status === 404) {
+        errorMsg = "Invalid or unrecognized QR code. This order could not be found.";
+      } else if (e.response?.data?.error) {
+        errorMsg = e.response.data.error;
+      } else if (e.response?.data?.detail) {
+        errorMsg = e.response.data.detail;
+      }
+
+      Alert.alert("Scan Failed", errorMsg);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   return (
@@ -28,21 +112,36 @@ export default function DonorScanScreen() {
       </View>
       
       <View style={styles.cameraContainer}>
-        {/* Dummy Camera View */}
-        <View style={styles.scannerFrame}>
-          <View style={[styles.corner, styles.topLeft]} />
-          <View style={[styles.corner, styles.topRight]} />
-          <View style={[styles.corner, styles.bottomLeft]} />
-          <View style={[styles.corner, styles.bottomRight]} />
-          
-          <Ionicons name="scan-outline" size={80} color="rgba(255,255,255,0.2)" />
+        <CameraView
+          style={StyleSheet.absoluteFill}
+          facing={facing}
+          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{
+            barcodeTypes: ["qr"],
+          }}
+        />
+        <View style={[styles.scannerOverlay, StyleSheet.absoluteFill]}>
+          <View style={styles.scannerFrame}>
+            <View style={[styles.corner, styles.topLeft]} />
+            <View style={[styles.corner, styles.topRight]} />
+            <View style={[styles.corner, styles.bottomLeft]} />
+            <View style={[styles.corner, styles.bottomRight]} />
+          </View>
+          <Text style={styles.instructions}>
+            {scanned ? "Processing QR code..." : "Position the Consumer's or Shelter's QR code within the frame to verify pickup."}
+          </Text>
         </View>
-        <Text style={styles.instructions}>Position the Consumer's or Shelter's QR code within the frame to verify pickup.</Text>
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: 20, right: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 12, borderRadius: 50 }}
+          onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
+        >
+          <Ionicons name="camera-reverse-outline" size={28} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.simulateBtn} onPress={simulateScan}>
-          <Text style={styles.simulateBtnText}>Simulate Scan Success</Text>
+        <TouchableOpacity style={[styles.simulateBtn, isScanning && { opacity: 0.7 }]} onPress={simulateScan} disabled={isScanning}>
+          <Text style={styles.simulateBtnText}>{isScanning ? 'Processing...' : `Simulate Scan Success (Order #${order_id || '?'})`}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -54,7 +153,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#111111', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#ffffff' },
   
-  cameraContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  cameraContainer: { flex: 1, backgroundColor: '#000' },
+  scannerOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.4)', padding: 24 },
   scannerFrame: {
     width: 250,
     height: 250,

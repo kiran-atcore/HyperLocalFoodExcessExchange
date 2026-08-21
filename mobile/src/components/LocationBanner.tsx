@@ -4,9 +4,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 
-export default function LocationBanner() {
-  const [locationName, setLocationName] = useState('123 Main St (Dummy)');
+interface LocationBannerProps {
+  address?: string;
+  onLocationChange?: (address: string, lat?: number, lng?: number) => void;
+  onMapPress?: () => void;
+  autoFetch?: boolean;
+}
+
+export default function LocationBanner({ address, onLocationChange, onMapPress, autoFetch }: LocationBannerProps = {}) {
   const [isFetching, setIsFetching] = useState(false);
+
+  React.useEffect(() => {
+    if (autoFetch) {
+      fetchGPSLocation();
+    }
+  }, [autoFetch]);
 
   const fetchGPSLocation = async () => {
     setIsFetching(true);
@@ -18,21 +30,43 @@ export default function LocationBanner() {
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
+      let location;
+      try {
+        // Try to get a cached/last known position first for instant speed
+        location = await Location.getLastKnownPositionAsync({});
+        
+        if (!location) {
+          // If no known position, fetch a fresh one but with Low accuracy for speed
+          location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+          });
+        }
+        
+        if (!location) {
+          throw new Error('GPS not available.');
+        }
+      } catch (e) {
+        Alert.alert('Error', 'Emulator GPS not set. Please set a location in Extended Controls.');
+        setIsFetching(false);
+        return;
+      }
       
       // Use free OpenStreetMap Nominatim API for reverse geocoding
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${location.coords.latitude}&lon=${location.coords.longitude}&format=json`);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.coords.latitude}&lon=${location.coords.longitude}&format=json`,
+        { headers: { 'User-Agent': 'HyperLocalFoodExcessExchange/1.0' } }
+      );
       const data = await response.json();
       
-      if (data && data.address) {
-        const placeName = data.address.road || data.address.suburb || data.address.city || "Current Location";
-        setLocationName(placeName);
+      if (data && data.display_name) {
+        onLocationChange?.(data.display_name, location.coords.latitude, location.coords.longitude);
       } else {
-        setLocationName(`GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`);
+        onLocationChange?.(`GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`, location.coords.latitude, location.coords.longitude);
       }
 
-    } catch (error) {
-      Alert.alert('Error fetching location');
+    } catch (error: any) {
+      Alert.alert('Error fetching location', error.message || 'Please ensure your emulator has a location set in Extended Controls.');
+      onLocationChange?.('Location Unavailable', undefined, undefined);
     } finally {
       setIsFetching(false);
     }
@@ -42,14 +76,13 @@ export default function LocationBanner() {
     <View style={styles.bannerContainer}>
       <TouchableOpacity 
         style={styles.textContainer} 
-        onPress={() => router.push('/(views)/map/location' as any)}
+        onPress={onMapPress}
       >
         <Ionicons name="location-outline" size={20} color="#10b981" />
         <View style={styles.textWrapper}>
           <Text style={styles.label}>Your Location</Text>
-          <Text style={styles.address} numberOfLines={1}>{locationName}</Text>
+          <Text style={styles.address} numberOfLines={1}>{address || 'Select a location...'}</Text>
         </View>
-        <Ionicons name="chevron-down" size={16} color="#64748b" />
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.iconButton} onPress={fetchGPSLocation}>

@@ -16,6 +16,9 @@ class FoodListing(models.Model):
     estimated_fmv = models.DecimalField(max_digits=6, decimal_places=2, help_text="Fair Market Value for Tax Receipt")
     
     quantity_available = models.PositiveIntegerField(default=1)
+    quantity_unit = models.CharField(max_length=20, default='portions')
+    dietary_info = models.CharField(max_length=50, default='None')
+    additional_details = models.TextField(blank=True, null=True)
     
     # Geolocation standard float fields for pure SQLite support
     latitude = models.FloatField()

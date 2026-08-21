@@ -1,0 +1,3 @@
+# List of native dependencies to bundle before a single build
+
+# (All dependencies have been installed and integrated)

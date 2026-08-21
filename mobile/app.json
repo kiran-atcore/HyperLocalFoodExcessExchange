@@ -34,7 +34,15 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow this app to save QR codes to your photo gallery.",
+          "savePhotosPermission": "Allow this app to save QR codes to your photo gallery."
+        }
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

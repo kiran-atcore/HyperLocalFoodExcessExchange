@@ -1,24 +1,125 @@
-import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React, { useState, useCallback, useRef } from 'react';
+import { View, StyleSheet, Text, ActivityIndicator, TextInput, TouchableOpacity, Keyboard, Platform, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
-
-const DUMMY_DONATIONS = [
-  { id: '1', title: '50lb Rice Bags (x3)', latitude: 37.78825, longitude: -122.4324, donor: 'Warehouse Co.', distance_km: 4.5 },
-  { id: '2', title: 'Produce Box', latitude: 37.79000, longitude: -122.4350, donor: 'Downtown Grocer', distance_km: 3.1 },
-];
+import { useFocusEffect, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '../../utils/api';
+import { sharedLocation } from '../../utils/sharedState';
 
 export default function ShelterMapScreen() {
-  const markersJs = DUMMY_DONATIONS.map(item => {
-    const color = '#3b82f6'; // Blue for Shelter/Bulk Donations
+  const [donations, setDonations] = useState<any[]>([]);
+  const [filteredDonations, setFilteredDonations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const webViewRef = useRef<WebView>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (sharedLocation.lat && sharedLocation.lng) {
+        setUserLocation({ lat: sharedLocation.lat, lng: sharedLocation.lng });
+      } else {
+        fetchUserLocation();
+      }
+      fetchDonations();
+    }, [])
+  );
+
+  const fetchUserLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      let loc;
+      try {
+        loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch (e) {
+        loc = await Location.getLastKnownPositionAsync({});
+      }
+      if (loc) {
+        setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        sharedLocation.lat = loc.coords.latitude;
+        sharedLocation.lng = loc.coords.longitude;
+      }
+    } catch (e) {}
+  };
+
+  const fetchDonations = async () => {
+    try {
+      const response = await api.get('/listings/?listing_type=DONATION');
+      const now = new Date().getTime();
+      const activeDonations = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      setDonations(activeDonations);
+      setFilteredDonations(activeDonations);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClaimFromMap = async (id: number) => {
+    try {
+      const response = await api.post('/orders/', { listing: id });
+      Alert.alert("Success", "Donation successfully claimed!");
+      fetchDonations(); // refresh map data
+      router.push(`/(views)/claim/${response.data.id}` as any);
+    } catch (e: any) {
+      Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim donation.");
+    }
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'claim' && data.id) {
+        handleClaimFromMap(data.id);
+      }
+    } catch (e) {
+      console.error('Failed to parse webview message', e);
+    }
+  };
+
+  const handleSearch = () => {
+    Keyboard.dismiss();
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      setFilteredDonations(donations);
+      return;
+    }
+    const filtered = donations.filter(item => 
+      item.title.toLowerCase().includes(query) || 
+      (item.description && item.description.toLowerCase().includes(query))
+    );
+    setFilteredDonations(filtered);
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return '';
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c; 
+    return d < 1 ? '< 1 km away' : `${d.toFixed(1)} km away`;
+  };
+
+  const markersJs = filteredDonations.map(item => {
+    const color = '#3b82f6';
+    const targetLat = item.donor_latitude || item.latitude;
+    const targetLng = item.donor_longitude || item.longitude;
+    const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
+    
     return `
-      L.circleMarker([${item.latitude}, ${item.longitude}], {
-        color: '${color}',
-        fillColor: '${color}',
-        fillOpacity: 0.9,
-        radius: 14,
-        weight: 2
-      }).addTo(map)
-        .bindPopup('<div style="font-family: sans-serif; text-align: center;"><b>${item.title}</b><br/><span style="color: #64748b;">${item.donor}</span><br/><small style="color: ${color}; font-weight: bold;">${item.distance_km} km away</small></div>');
+      var m_${item.id} = L.marker([${targetLat || 37.78825}, ${targetLng || -122.4324}]).addTo(map);
+      mapMarkers[${item.id}] = m_${item.id};
+      markerExpirations[${item.id}] = '${item.pickup_end || ''}';
+      m_${item.id}.bindPopup('<div style="font-family: sans-serif; text-align: center;"><b>${item.title.replace(/'/g, "\\'")}</b><br/><span style="color: #64748b;">${(item.donor_name || 'Donor').replace(/'/g, "\\'")}</span><br/><small style="color: ${color}; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><small style="color: #64748b;">Qty: ${item.quantity_available} ${item.quantity_unit}</small><br/><button ${item.is_claimed ? 'disabled' : ''} onclick="handleClaimClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: ${item.is_claimed ? '#94a3b8' : '#3b82f6'}; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">${item.is_claimed ? 'Already Claimed' : 'Claim for NGO'}</button></div>');
     `;
   }).join('\n');
 
@@ -38,32 +139,132 @@ export default function ShelterMapScreen() {
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: false }).setView([37.78825, -122.4324], 14);
+        var DefaultIcon = L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+        L.Marker.prototype.options.icon = DefaultIcon;
+
+        var initialLat = ${userLocation ? userLocation.lat : 37.78825};
+        var initialLng = ${userLocation ? userLocation.lng : -122.4324};
+        var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLng], 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap © CARTO'
         }).addTo(map);
 
+        ${userLocation ? `
+        L.circleMarker([${userLocation.lat}, ${userLocation.lng}], {
+          color: '#10b981',
+          fillColor: '#10b981',
+          fillOpacity: 1,
+          radius: 8,
+          weight: 3,
+          color: '#ffffff'
+        }).addTo(map).bindPopup('<b>You are here</b>');
+        ` : ''}
+
+        var mapMarkers = {};
+        var markerExpirations = {};
+
         ${markersJs}
+
+        function setMapLocation(lat, lng) {
+          map.setView([lat, lng], 14);
+        }
+
+        function handleClaimClick(id) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type: 'claim', id: id}));
+        }
+
+        // Live Countdown Timer Logic for Popups
+        setInterval(function() {
+          var now = new Date().getTime();
+          
+          for (var id in markerExpirations) {
+             var expires = markerExpirations[id];
+             if (expires) {
+                 var target = new Date(expires).getTime();
+                 if (target - now <= 0) {
+                     if (mapMarkers[id]) {
+                         map.removeLayer(mapMarkers[id]);
+                         delete mapMarkers[id];
+                     }
+                 }
+             }
+          }
+
+          var timers = document.querySelectorAll('.countdown-timer');
+          timers.forEach(function(timer) {
+            var expiresAttr = timer.getAttribute('data-expires');
+            if (!expiresAttr) return;
+            var target = new Date(expiresAttr).getTime();
+            var diff = target - now;
+            if (diff > 0) {
+              var h = Math.floor(diff / (1000 * 60 * 60));
+              var m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+              var s = Math.floor((diff % (1000 * 60)) / 1000);
+              timer.innerHTML = 'Expires in: ' + h + 'h ' + m + 'm ' + s + 's';
+              timer.style.color = '#f59e0b';
+            } else {
+              timer.innerHTML = 'Expired';
+              timer.style.color = '#ef4444';
+            }
+          });
+        }, 1000);
       </script>
     </body>
     </html>
   `;
 
   return (
-    <View style={styles.container}>
-      <WebView
-        originWhitelist={['*']}
-        source={{ html: leafletHtml }}
-        style={styles.map}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-      />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search food items (e.g. burgers)..."
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              if (text === '') setFilteredDonations(donations);
+            }}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+        </View>
+      </View>
+
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      ) : (
+        <WebView
+          key={filteredDonations.length}
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: leafletHtml }}
+          style={styles.map}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          onMessage={handleWebViewMessage}
+        />
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
+  searchContainer: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', zIndex: 10 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 16, color: '#0f172a' },
   map: { flex: 1 },
 });

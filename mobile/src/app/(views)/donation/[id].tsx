@@ -1,10 +1,47 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '../../../utils/api';
+import CountdownTimer from '../../../components/CountdownTimer';
 
 export default function DonationViewScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, distance } = useLocalSearchParams();
+  const [listing, setListing] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    fetchListing();
+  }, [id]);
+
+  const fetchListing = async () => {
+    try {
+      const response = await api.get(`/listings/${id}/`);
+      setListing(response.data);
+      if (response.data.pickup_end) {
+        setIsExpired(new Date(response.data.pickup_end).getTime() <= new Date().getTime());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClaim = async () => {
+    setIsClaiming(true);
+    try {
+      const response = await api.post('/orders/', { listing: id });
+      Alert.alert("Success", "Donation successfully claimed!");
+      router.replace(`/(views)/claim/${response.data.id}` as any);
+    } catch (e: any) {
+      Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim donation.");
+      setIsClaiming(false);
+    }
+  };
 
   const leafletHtml = `
     <!DOCTYPE html>
@@ -21,13 +58,13 @@ export default function DonationViewScreen() {
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([37.78825, -122.4324], 15);
+        var map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([${listing?.donor_latitude || listing?.latitude || 37.78825}, ${listing?.donor_longitude || listing?.longitude || -122.4324}], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        L.circleMarker([37.78825, -122.4324], {
+        L.circleMarker([${listing?.donor_latitude || listing?.latitude || 37.78825}, ${listing?.donor_longitude || listing?.longitude || -122.4324}], {
           color: '#3b82f6',
           fillColor: '#3b82f6',
           fillOpacity: 0.9,
@@ -39,35 +76,61 @@ export default function DonationViewScreen() {
     </html>
   `;
 
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!listing) return null;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={{ flex: 1 }}>
-        <Image source={{ uri: 'https://images.unsplash.com/photo-1593504049359-74330189a345?w=800' }} style={styles.image} />
+        <Image source={{ uri: listing.image || 'https://images.unsplash.com/photo-1593504049359-74330189a345?w=800' }} style={styles.image} />
       
       <View style={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Bulk Donation #{id}</Text>
-          <Text style={styles.badge}>FREE</Text>
+          <Text style={styles.title}>{listing.title}</Text>
+          <Text style={styles.badge}>{listing.listing_type === 'DONATION' ? 'FREE' : `$${listing.discounted_price}`}</Text>
         </View>
-        <Text style={styles.vendor}>Warehouse Co. • 4.5 km away</Text>
+        <Text style={styles.vendor}>{listing.donor_name || 'Donor'} • {distance || 'Distance unknown'}</Text>
         
         <Text style={styles.sectionTitle}>Details</Text>
         <Text style={styles.description}>
-          We have three 50lb bags of white rice available. Slightly damaged packaging on one bag but contents are perfectly safe. Must be picked up today.
+          {listing.description || 'No description provided.'}
         </Text>
         
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Estimated Value:</Text>
-          <Text style={styles.infoValue}>$150.00</Text>
+          <Text style={styles.infoValue}>${listing.estimated_fmv || '0.00'}</Text>
+        </View>
+        <View style={[styles.infoRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 6 }]}>
+          <Text style={styles.infoLabel}>Expiration Date:</Text>
+          <Text style={styles.infoValueTime}>
+            {listing.pickup_end ? new Date(listing.pickup_end).toLocaleString() : 'N/A'}
+          </Text>
+          {listing.pickup_end && (
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#64748b' }}>
+              Time remaining: <CountdownTimer targetDate={listing.pickup_end} onExpire={() => setIsExpired(true)} />
+            </Text>
+          )}
         </View>
         <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Claim By:</Text>
-          <Text style={styles.infoValueTime}>Today 5:00 PM</Text>
+          <Text style={styles.infoLabel}>Total Quantity:</Text>
+          <Text style={styles.infoValue}>{listing.quantity_available} {listing.quantity_unit}</Text>
         </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Total Weight:</Text>
-          <Text style={styles.infoValue}>150 lbs</Text>
-        </View>
+
+        {listing.additional_details ? (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Additional Details</Text>
+            <View style={{ backgroundColor: '#ffffff', padding: 12, borderRadius: 8, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' }}>
+              <Text style={{ fontSize: 14, color: '#334155', lineHeight: 20 }}>{listing.additional_details}</Text>
+            </View>
+          </>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Pickup Location</Text>
         <View style={styles.mapContainer}>
@@ -83,10 +146,16 @@ export default function DonationViewScreen() {
       
       <View style={styles.footer}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Cancel</Text>
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.reserveButton} onPress={() => router.push(`/(views)/claim/${id}` as any)}>
-          <Text style={styles.reserveButtonText}>Claim for NGO</Text>
+        <TouchableOpacity 
+          style={[styles.reserveButton, (listing.is_claimed || isExpired) && { backgroundColor: '#94a3b8' }]} 
+          onPress={handleClaim} 
+          disabled={isClaiming || listing.is_claimed || isExpired}
+        >
+          <Text style={styles.reserveButtonText}>
+            {listing.is_claimed ? 'Already Claimed' : (isExpired ? 'Expired' : (isClaiming ? 'Claiming...' : 'Claim for NGO'))}
+          </Text>
         </TouchableOpacity>
       </View>
       </ScrollView>

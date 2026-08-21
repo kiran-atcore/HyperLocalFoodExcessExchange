@@ -9,7 +9,7 @@ import { AuthContext } from '../../context/AuthContext';
 import api from '../../utils/api';
 
 const schema = yup.object().shape({
-  username: yup.string().required('Name is required'),
+  business_name: yup.string().required('Name is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
   password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
   confirmPassword: yup.string()
@@ -25,7 +25,7 @@ export default function RegisterScreen() {
 
   const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
-    defaultValues: { username: '', email: '', password: '', confirmPassword: '' }
+    defaultValues: { business_name: '', email: '', password: '', confirmPassword: '' }
   });
 
   const onSubmit = async (data: any) => {
@@ -34,7 +34,8 @@ export default function RegisterScreen() {
     try {
       // 1. Register User
       await api.post('/users/register/', {
-        username: data.username,
+        username: data.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.floor(Math.random() * 10000),
+        business_name: data.business_name,
         email: data.email,
         password: data.password,
         role: role
@@ -80,11 +81,11 @@ export default function RegisterScreen() {
       <View style={styles.inputContainer}>
         <Controller
           control={control}
-          name="username"
+          name="business_name"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <TextInput style={[styles.input, errors.username && styles.inputError]} placeholder="Full Name or Org Name" onBlur={onBlur} onChangeText={onChange} value={value} />
-              {errors.username && <Text style={styles.validationError}>{errors.username.message}</Text>}
+              <TextInput style={[styles.input, errors.business_name && styles.inputError]} placeholder="Full Name or Org Name" onBlur={onBlur} onChangeText={onChange} value={value} />
+              {errors.business_name && <Text style={styles.validationError}>{errors.business_name.message}</Text>}
             </>
           )}
         />

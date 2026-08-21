@@ -1,30 +1,50 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-
-const DUMMY_REQUESTS = [
-  { id: '1', name: 'John Doe', item: 'Assorted Pastries (x2)', time: 'ETA: 5:15 PM', type: 'CONSUMER' },
-  { id: '2', name: 'Hope Shelter Inc.', item: '50lb Rice Bags (x3)', time: 'ETA: 5:45 PM', type: 'SHELTER' },
-];
+import { router, useFocusEffect } from 'expo-router';
+import api from '../../utils/api';
 
 export default function DonorRequestsScreen() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/orders/');
+      // Filter out picked up or cancelled orders
+      const activeOrders = response.data.filter((o: any) => o.status === 'PENDING' || o.status === 'APPROVED');
+      setOrders(activeOrders);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
   const renderItem = ({ item }: any) => {
-    const isShelter = item.type === 'SHELTER';
+    const isShelter = item.requester_details?.role === 'shelter';
     return (
-      <TouchableOpacity style={[styles.card, { borderLeftColor: isShelter ? '#3b82f6' : '#10b981' }]} onPress={() => router.push(`/(views)/request/${item.id}` as any)}>
+      <TouchableOpacity style={[styles.card, { borderLeftColor: isShelter ? '#3b82f6' : '#10b981' }]} onPress={() => router.push({ pathname: '/(donor)/scan', params: { order_id: item.id } })}>
         <View style={styles.headerRow}>
           <View style={styles.userCol}>
-            <Text style={styles.name}>{item.name}</Text>
+            <Text style={styles.name}>{item.requester_details?.name}</Text>
             <View style={[styles.badge, { backgroundColor: isShelter ? '#eff6ff' : '#ecfdf5' }]}>
-              <Text style={[styles.badgeText, { color: isShelter ? '#2563eb' : '#059669' }]}>{item.type}</Text>
+              <Text style={[styles.badgeText, { color: isShelter ? '#2563eb' : '#059669' }]}>
+                {item.requester_details?.role?.toUpperCase()}
+              </Text>
             </View>
           </View>
           <Ionicons name="time-outline" size={20} color="#f59e0b" />
         </View>
-        <Text style={styles.itemText}>{item.item}</Text>
-        <Text style={styles.timeText}>{item.time}</Text>
+        <Text style={styles.itemText}>{item.listing_details?.title}</Text>
+        <Text style={styles.timeText}>{item.eta ? `ETA: ${new Date(item.eta).toLocaleTimeString()}` : 'No ETA Provided'}</Text>
       </TouchableOpacity>
     );
   };
@@ -32,12 +52,18 @@ export default function DonorRequestsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Incoming Pickups</Text>
-      <FlatList 
-        data={DUMMY_REQUESTS} 
-        renderItem={renderItem} 
-        keyExtractor={item => item.id} 
-        contentContainerStyle={styles.list}
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
+      ) : orders.length === 0 ? (
+        <Text style={{ textAlign: 'center', marginTop: 40, color: '#64748b' }}>No incoming pickups at the moment.</Text>
+      ) : (
+        <FlatList 
+          data={orders} 
+          renderItem={renderItem} 
+          keyExtractor={item => item.id.toString()} 
+          contentContainerStyle={styles.list}
+        />
+      )}
     </SafeAreaView>
   );
 }

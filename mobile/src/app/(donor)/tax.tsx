@@ -1,15 +1,33 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
-const DUMMY_DONATIONS = [
-  { id: '1', date: 'Oct 12, 2023', item: 'Produce Box', value: '$85.00', ngo: 'Hope Shelter Inc.' },
-  { id: '2', date: 'Nov 04, 2023', item: '50lb Rice Bags (x3)', value: '$150.00', ngo: 'Downtown Food Bank' },
-  { id: '3', date: 'Dec 18, 2023', item: 'Canned Goods Pallet', value: '$220.00', ngo: 'Community Kitchen' },
-];
+import { useFocusEffect } from 'expo-router';
+import api from '../../utils/api';
 
 export default function DonorTaxScreen() {
+  const [receipts, setReceipts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchReceipts();
+    }, [])
+  );
+
+  const fetchReceipts = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/tax-receipts/');
+      setReceipts(response.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalValue = receipts.reduce((sum, r) => sum + parseFloat(r.estimated_value || '0'), 0).toFixed(2);
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -20,8 +38,8 @@ export default function DonorTaxScreen() {
         
         <View style={styles.summaryCard}>
           <Text style={styles.summaryLabel}>Total Estimated Value</Text>
-          <Text style={styles.summaryValue}>$455.00</Text>
-          <Text style={styles.summaryYear}>2023 Tax Year</Text>
+          <Text style={styles.summaryValue}>${totalValue}</Text>
+          <Text style={styles.summaryYear}>{new Date().getFullYear()} Tax Year</Text>
         </View>
 
         <TouchableOpacity style={styles.exportBtn}>
@@ -31,16 +49,22 @@ export default function DonorTaxScreen() {
 
         <Text style={styles.sectionTitle}>Recent Bulk Donations</Text>
         
-        {DUMMY_DONATIONS.map((donation) => (
-          <View key={donation.id} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.date}>{donation.date}</Text>
-              <Text style={styles.value}>{donation.value}</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 20 }} />
+        ) : receipts.length === 0 ? (
+          <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 20 }}>No tax receipts yet. When a shelter picks up a donation, receipts appear here.</Text>
+        ) : (
+          receipts.map((receipt) => (
+            <View key={receipt.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.date}>{new Date(receipt.created_at).toLocaleDateString()}</Text>
+                <Text style={styles.value}>${receipt.estimated_value}</Text>
+              </View>
+              <Text style={styles.item}>{receipt.listing_title}</Text>
+              <Text style={styles.ngo}>To: {receipt.ngo_name}</Text>
             </View>
-            <Text style={styles.item}>{donation.item}</Text>
-            <Text style={styles.ngo}>To: {donation.ngo}</Text>
-          </View>
-        ))}
+          ))
+        )}
 
       </ScrollView>
     </SafeAreaView>

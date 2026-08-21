@@ -1,22 +1,53 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { DeviceEventEmitter } from 'react-native';
 
 export default function MapSelectionScreen() {
+  const params = useLocalSearchParams();
+  const initialLat = params.lat ? parseFloat(params.lat as string) : 37.78825;
+  const initialLng = params.lng ? parseFloat(params.lng as string) : -122.4324;
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedCoords, setSelectedCoords] = useState({ lat: 37.78825, lng: -122.4324 });
+  const [selectedCoords, setSelectedCoords] = useState({ lat: initialLat, lng: initialLng });
+  const [addressName, setAddressName] = useState('Fetching address...');
   const webViewRef = useRef<WebView>(null);
+
+  React.useEffect(() => {
+    fetchAddress(selectedCoords.lat, selectedCoords.lng);
+  }, [selectedCoords]);
+
+  const fetchAddress = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'User-Agent': 'HyperLocalFoodExcessExchange/1.0' } }
+      );
+      const data = await response.json();
+      if (data && data.display_name) {
+        setAddressName(data.display_name);
+      } else {
+        setAddressName(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+      }
+    } catch (e) {
+      setAddressName(`Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`);
+    }
+  };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     Keyboard.dismiss();
     setIsSearching(true);
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'HyperLocalFoodExcessExchange/1.0' } }
+      );
+      if (!response.ok) throw new Error('Search failed');
       const data = await response.json();
       if (data && data.length > 0) {
         const { lat, lon } = data[0];
@@ -43,7 +74,7 @@ export default function MapSelectionScreen() {
   };
 
   const confirmLocation = () => {
-    // In a real app, this would update the global Context/Redux
+    DeviceEventEmitter.emit('onLocationSelected', { lat: selectedCoords.lat, lng: selectedCoords.lng, address: addressName });
     router.back();
   };
 
@@ -62,13 +93,13 @@ export default function MapSelectionScreen() {
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: false }).setView([37.78825, -122.4324], 13);
+        var map = L.map('map', { zoomControl: false }).setView([${selectedCoords.lat}, ${selectedCoords.lng}], 13);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        var marker = L.marker([37.78825, -122.4324], {
+        var marker = L.marker([${selectedCoords.lat}, ${selectedCoords.lng}], {
           draggable: true
         }).addTo(map);
 
@@ -130,8 +161,8 @@ export default function MapSelectionScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.coordsText}>
-            Lat: {selectedCoords.lat.toFixed(4)}, Lng: {selectedCoords.lng.toFixed(4)}
+          <Text style={styles.addressText} numberOfLines={2}>
+            {addressName}
           </Text>
           <TouchableOpacity style={styles.confirmBtn} onPress={confirmLocation}>
             <Text style={styles.confirmBtnText}>Confirm Location</Text>
@@ -187,9 +218,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e2e8f0',
   },
-  coordsText: {
-    fontSize: 12,
-    color: '#64748b',
+  addressText: {
+    fontSize: 14,
+    color: '#0f172a',
+    fontWeight: '500',
     textAlign: 'center',
     marginBottom: 12,
   },

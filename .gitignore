@@ -45,3 +45,6 @@ android/
 .vscode/
 .idea/
 .agents/
+
+# Dummy Scripts
+*dummy*.py

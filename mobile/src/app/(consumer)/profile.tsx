@@ -76,13 +76,7 @@ export default function ConsumerProfileScreen() {
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Account</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="settings-outline" size={22} color="#64748b" />
-              <Text style={styles.menuItemText}>Account Settings</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-          </TouchableOpacity>
+
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemLeft}>

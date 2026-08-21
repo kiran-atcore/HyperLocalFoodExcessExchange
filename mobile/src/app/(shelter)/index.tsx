@@ -1,33 +1,151 @@
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import LocationBanner from '../../components/LocationBanner';
-
-const DUMMY_RESCUE_FEED = [
-  { id: '1', title: '50lb Rice Bags (x3)', donor: 'Warehouse Co.', distance: '4.5 km', expires: 'Today 5 PM' },
-  { id: '2', title: 'Produce Box (Slightly bruised)', donor: 'Downtown Grocer', distance: '3.1 km', expires: 'Tomorrow 10 AM' },
-];
+import { router, useFocusEffect } from 'expo-router';
+import api from '../../utils/api';
+import { sharedLocation } from '../../utils/sharedState';
+import CountdownTimer from '../../components/CountdownTimer';
 
 export default function ShelterFeedScreen() {
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/donation/${item.id}` as any)}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.donor}>{item.donor} • {item.distance}</Text>
-      <View style={styles.footerRow}>
-        <Text style={styles.time}>Claim by: {item.expires}</Text>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Claim for NGO</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+  const [feed, setFeed] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [claimingId, setClaimingId] = useState<number | null>(null);
+  const [isLocationReady, setIsLocationReady] = useState(false);
+  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
+      if (data.lat && data.lng) {
+        setLocation({ lat: data.lat, lng: data.lng });
+        sharedLocation.lat = data.lat;
+        sharedLocation.lng = data.lng;
+        sharedLocation.address = data.address;
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchFeed();
+    }, [])
   );
+
+  const fetchFeed = async () => {
+    try {
+      const [listingsRes, profileRes] = await Promise.all([
+        api.get('/listings/?listing_type=DONATION'),
+        api.get('/users/me/')
+      ]);
+      const now = new Date().getTime();
+      const activeDonations = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      setFeed(activeDonations);
+
+      const profile = profileRes.data;
+      if (profile.latitude && profile.longitude) {
+        setLocation({ lat: profile.latitude, lng: profile.longitude });
+        sharedLocation.lat = profile.latitude;
+        sharedLocation.lng = profile.longitude;
+        sharedLocation.address = profile.address || '';
+      }
+      setIsLocationReady(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 'Unknown distance';
+    const R = 6371; // Radius of the earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c; 
+    return d < 1 ? '< 1 km' : `${d.toFixed(1)} km`;
+  };
+
+  const handleClaim = async (id: number) => {
+    setClaimingId(id);
+    try {
+      const response = await api.post('/orders/', { listing: id });
+      alert("Success! You have claimed this donation.");
+      router.push(`/(views)/claim/${response.data.id}` as any);
+    } catch (e: any) {
+      console.error(e.response?.data || e.message);
+      alert("Error: Could not claim this donation.");
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  const removeListing = (id: number) => {
+    setFeed(prev => prev.filter(item => item.id !== id));
+  };
+
+  const renderItem = ({ item }: any) => {
+    const targetLat = item.donor_latitude || item.latitude;
+    const targetLng = item.donor_longitude || item.longitude;
+    const distanceStr = location && targetLat && targetLng 
+      ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
+      : 'Distance unknown';
+      
+    return (
+      <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/donation/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.donor}>{item.donor_name || 'Donor'} • {distanceStr}</Text>
+        <Text style={[styles.time, { color: '#64748b', marginBottom: 12, fontSize: 13 }]}>
+          Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => removeListing(item.id)} />
+        </Text>
+        <View style={styles.footerRow}>
+          <Text style={styles.time}>{item.quantity_available} {item.quantity_unit || 'portions'}</Text>
+          <TouchableOpacity 
+            style={[styles.button, (claimingId === item.id || item.is_claimed) && { opacity: 0.7, backgroundColor: item.is_claimed ? '#94a3b8' : '#3b82f6' }]} 
+            onPress={() => handleClaim(item.id)} 
+            disabled={claimingId === item.id || item.is_claimed}
+          >
+            {claimingId === item.id ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <Text style={styles.buttonText}>{item.is_claimed ? 'Already Claimed' : 'Claim for NGO'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <LocationBanner />
-      <Text style={styles.header}>Priority Rescue Feed</Text>
-      <Text style={styles.subtitle}>100% Free Bulk Donations</Text>
-      <FlatList data={DUMMY_RESCUE_FEED} renderItem={renderItem} keyExtractor={item => item.id} />
+      <View style={{ paddingTop: 16 }}>
+        <Text style={styles.header}>Priority Rescue Feed</Text>
+        <Text style={styles.subtitle}>100% Free Bulk Donations</Text>
+      </View>
+      
+      {!isLocationReady ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 40 }}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={{ marginTop: 16, color: '#64748b', fontWeight: '500' }}>Locating your shelter...</Text>
+        </View>
+      ) : loading ? (
+        <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList 
+          data={feed} 
+          renderItem={renderItem} 
+          keyExtractor={item => item.id.toString()} 
+          contentContainerStyle={{ paddingBottom: 100 }}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No priority donations available right now.</Text>}
+        />
+      )}
     </SafeAreaView>
   );
 }

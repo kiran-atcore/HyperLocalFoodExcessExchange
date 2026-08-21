@@ -6,7 +6,6 @@ import LocationBanner from '../../components/LocationBanner';
 const DUMMY_DEALS = [
   { id: '1', title: 'Assorted Pastries', vendor: 'Sunrise Bakery', distance: '1.2 km', originalPrice: 12.0, discountedPrice: 4.5, time: 'Pickup by 6 PM', type: 'DISCOUNT', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400' },
   { id: '2', title: 'Veggie Pizza Slices', vendor: 'Luigi\'s Pizzeria', distance: '2.5 km', originalPrice: 15.0, discountedPrice: 5.0, time: 'Pickup by 9 PM', type: 'DISCOUNT', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400' },
-  { id: '3', title: 'Produce Box', vendor: 'Downtown Grocer', distance: '3.1 km', originalPrice: 20.0, discountedPrice: 0.0, time: 'Pickup by 8 PM', type: 'DONATION', image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400' },
 ];
 
 export default function ConsumerFeedScreen() {
