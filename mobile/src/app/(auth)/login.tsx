@@ -1,5 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useContext, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -17,6 +18,7 @@ export default function LoginScreen() {
   const { login } = useContext(AuthContext);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { control, handleSubmit, formState: { errors }, setValue } = useForm({
     resolver: yupResolver(schema),
@@ -33,7 +35,10 @@ export default function LoginScreen() {
     setErrorMsg('');
     setIsLoading(true);
     try {
-      const response = await api.post('/users/login/', data);
+      const response = await api.post('/users/login/', {
+        ...data,
+        email: data.email.trim()
+      });
       await login(response.data.access, response.data.refresh);
       router.replace('/');
     } catch (err: any) {
@@ -75,14 +80,19 @@ export default function LoginScreen() {
           name="password"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <TextInput 
-                style={[styles.input, errors.password && styles.inputError]} 
-                placeholder="Password" 
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                secureTextEntry
-              />
+              <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
+                <TextInput 
+                  style={styles.passwordInput} 
+                  placeholder="Password" 
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               {errors.password && <Text style={styles.validationError}>{errors.password.message}</Text>}
             </>
           )}
@@ -117,6 +127,9 @@ const styles = StyleSheet.create({
   validationError: { color: '#ef4444', fontSize: 12, marginBottom: 8, marginTop: -12, marginLeft: 4 },
   inputContainer: { marginBottom: 24 },
   input: { backgroundColor: '#ffffff', padding: 16, borderRadius: 12, marginBottom: 16, fontSize: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  passwordInput: { flex: 1, padding: 16, fontSize: 16 },
+  eyeIcon: { padding: 16 },
   inputError: { borderColor: '#ef4444' },
   button: { backgroundColor: '#10b981', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 16 },
   buttonText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },

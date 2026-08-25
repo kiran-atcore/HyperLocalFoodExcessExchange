@@ -11,8 +11,6 @@ export default function AdminLayout() {
         backgroundColor: '#ffffff',
         borderTopWidth: 1,
         borderTopColor: '#f1f5f9',
-        height: 60,
-        paddingBottom: 8,
         paddingTop: 8,
       },
     }}>

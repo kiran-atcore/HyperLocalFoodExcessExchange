@@ -1,33 +1,69 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const DUMMY_PASSES = [
-  { id: '101', title: 'Assorted Pastries', vendor: 'Sunrise Bakery', status: 'READY', hash: 'qr-hash-101' },
-  { id: '102', title: 'Veggie Pizza Slices', vendor: 'Luigi\'s Pizzeria', status: 'REDEEMED', hash: 'qr-hash-102' }
-];
+import api from '../../utils/api';
 
 export default function WalletScreen() {
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity style={[styles.card, item.status === 'REDEEMED' && styles.cardFaded]} activeOpacity={0.8} onPress={() => router.push(`/(views)/receipt/${item.id}` as any)}>
-      <View style={styles.qrContainer}>
-        <QRCode value={item.hash} size={80} color={item.status === 'REDEEMED' ? '#cbd5e1' : '#0f172a'} />
-      </View>
-      <View style={styles.details}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.vendor}>{item.vendor}</Text>
-        <Text style={[styles.status, item.status === 'READY' ? styles.statusReady : styles.statusRedeemed]}>
-          {item.status}
-        </Text>
-      </View>
-    </TouchableOpacity>
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrders();
+    }, [])
   );
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/orders/');
+      setOrders(response.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderItem = ({ item }: any) => {
+    const isRedeemed = item.status === 'PICKED_UP' || item.status === 'CANCELLED' || item.status === 'EXPIRED';
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.card, isRedeemed && styles.cardFaded]} 
+        activeOpacity={0.8} 
+        onPress={() => router.push(`/(views)/receipt/${item.id}` as any)}
+      >
+        <View style={styles.qrContainer}>
+          <QRCode value={item.qr_code_id || item.id.toString()} size={80} color={isRedeemed ? '#cbd5e1' : '#0f172a'} />
+        </View>
+        <View style={styles.details}>
+          <Text style={styles.title}>{item.listing_details?.title || 'Unknown Item'}</Text>
+          <Text style={styles.vendor}>{item.listing_details?.donor_name || 'Vendor'}</Text>
+          <Text style={[styles.status, !isRedeemed ? styles.statusReady : styles.statusRedeemed]}>
+            {item.status}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Pickup Wallet</Text>
-      <FlatList data={DUMMY_PASSES} renderItem={renderItem} keyExtractor={item => item.id} showsVerticalScrollIndicator={false} />
+      {loading ? (
+        <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList 
+          data={orders} 
+          renderItem={renderItem} 
+          keyExtractor={item => item.id.toString()} 
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No pickup passes found.</Text>}
+        />
+      )}
     </SafeAreaView>
   );
 }

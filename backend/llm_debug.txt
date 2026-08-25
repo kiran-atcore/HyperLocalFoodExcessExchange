@@ -1,0 +1,113 @@
+<think>
+Here's a thinking process:
+
+1.  **Analyze User Input:**
+   - **Role:** Fair market food appraiser in India evaluating an 80G tax receipt donation.
+   - **Donor Type:** Retailer
+   - **Item:** Title: "Test Food", Description: "Test Description", Quantity: 10 portions
+   - **Task:** Estimate fair market value in INR based on standard Indian retail food prices.
+   - **Output Format:** Strict JSON matching a specific schema.
+
+2.  **Identify Key Constraints & Challenges:**
+   - The item is generic: "Test Food" / "Test Description". This is clearly a placeholder/test input.
+   - As an appraiser, I need to handle this realistically. I can't appraise "Test Food" literally, but I should provide a reasonable estimate based on typical Indian retail food portions, or explicitly state the limitation while still providing a plausible value for a standard food item.
+   - The schema requires specific fields: `is_fraudulent`, `suggested_value_inr`, `report.reasoning`, `report.breakdown` (ingredients, labour, service, misc).
+   - I must output *only* valid JSON matching the schema.
+
+3.  **Determine Appraisal Approach:**
+   - Since it's "Test Food", I'll assume a standard, common Indian retail food item for appraisal purposes (e.g., a basic meal/snack like a plate of dal-rice or a standard packaged food item). Let's go with a standard retail food portion (e.g., a basic meal/snack) priced around ₹80-₹120 per portion in India.
+   - Quantity: 10 portions.
+   - Let's estimate ₹100 per portion → ₹1000 total.
+   - Breakdown for a typical retail food item:
+     - Ingredients: ~60% (₹600)
+     - Labour: ~15% (₹150)
+     - Service/Overhead: ~15% (₹150)
+     - Misc/Packaging/Transport: ~10% (₹100)
+   - Check for fraud: "Test Food" with "Test Description" is likely a placeholder, not inherently fraudulent, but I'll mark `is_fraudulent: false` as per standard practice unless there's clear red flags. I'll note in reasoning that it's a generic/test entry and the valuation is based on standard market rates for a typical retail food portion.
+   - Ensure JSON structure matches exactly.
+
+4.  **Draft JSON (Mental Refinement):**
+   ```json
+   {
+       "is_fraudulent": false,
+       "suggested_value_inr": 1000.0,
+       "report": {
+           "reasoning": "The item listed as 'Test Food' with a generic description lacks specific details for precise valuation. As a fair market appraiser, I have applied standard Indian retail pricing for a typical prepared food portion (e.g., a basic meal or snack), which averages ₹100 per portion in current market conditions. For 10 portions, the total fair market value is estimated at ₹1,000. The breakdown reflects standard cost structures for retail food items in India, where ingredients constitute the largest share, followed by labour, service/overhead, and miscellaneous costs like packaging and handling.",
+           "breakdown": {
+               "ingredients": 600.0,
+               "labour": 150.0,
+               "service": 150.0,
+               "misc": 100.0
+           }
+       }
+   }
+   ```
+
+5.  **Validate against Schema:**
+   - `is_fraudulent`: boolean → false ✓
+   - `suggested_value_inr`: number → 1000.0 ✓
+   - `report.reasoning`: string ✓
+   - `report.breakdown.ingredients`: number ✓
+   - `report.breakdown.labour`: number ✓
+   - `report.breakdown.service`: number ✓
+   - `report.breakdown.misc`: number ✓
+   - All fields match exactly. No extra fields. JSON format strict.
+
+6.  **Final Output Generation:** (Self-Correction/Verification during thought)
+   - Check if the prompt requires any specific handling for "Test Food". It's clearly a test input, so providing a reasonable placeholder valuation with clear reasoning is appropriate.
+   - The breakdown sums to 1000.0, matching suggested_value_inr. Good.
+   - The reasoning explicitly addresses the generic nature and justifies the valuation based on Indian retail standards.
+   - JSON structure is exact.
+   - Ready. Output matches the draft.✅
+   - One minor thing: The prompt says "Respond in JSON format. The JSON object must exactly match the following schema:". I will output only the JSON. No markdown if possible, but markdown code blocks are usually fine. I'll stick to raw JSON to be safe, or use standard formatting. The prompt doesn't forbid markdown, but I'll ensure it's valid JSON.
+
+   All constraints met. Proceed. 
+   Output matches the drafted JSON.✅
+   Note: I'll make sure the numbers are floats as in the schema example (0.0). The schema shows `0.0` for numbers, so I'll use `1000.0`, `600.0`, etc.
+   All good.✅
+   Output generation. 
+   ```json
+   {
+       "is_fraudulent": false,
+       "suggested_value_inr": 1000.0,
+       "report": {
+           "reasoning": "The item listed as 'Test Food' with a generic description lacks specific details for precise valuation. As a fair market appraiser, I have applied standard Indian retail pricing for a typical prepared food portion (e.g., a basic meal or snack), which averages ₹100 per portion in current market conditions. For 10 portions, the total fair market value is estimated at ₹1,000. The breakdown reflects standard cost structures for retail food items in India, where ingredients constitute the largest share, followed by labour, service/overhead, and miscellaneous costs like packaging and handling.",
+           "breakdown": {
+               "ingredients": 600.0,
+               "labour": 150.0,
+               "service": 150.0,
+               "misc": 100.0
+           }
+       }
+   }
+   ```
+   Matches perfectly. Proceeds. 
+   Self-Correction/Refinement during thought: 
+   Should I consider 80G tax receipt context? 80G is for charitable donations. The valuation should reflect fair market value for tax deduction purposes. The approach is correct. The generic nature is acknowledged. The breakdown sums correctly. All good.✅
+   Output matches. 
+   [Done] 
+   *Self-Correction/Verification during output generation prep*: 
+   The prompt says "Respond in JSON format. The JSON object must exactly match the following schema:". I will output strictly the JSON object without markdown formatting to be perfectly compliant, though markdown is usually acceptable. I'll just output raw JSON. Actually, markdown is fine, but I'll ensure it's valid. I'll stick to raw JSON to be safe. All values are numbers/strings/booleans as specified. Schema matches exactly. Ready. 
+   Output matches the draft.✅
+   Proceeds. 
+   [Output Generation] -> *Proceeds*
+   *(Note: I'll format it cleanly as JSON)*
+   `{ "is_fraudulent": false, "suggested_value_inr": 1000.0, "report": { "reasoning": "...", "breakdown": { "ingredients": 600.0, "labour": 150.0, "service": 150.0, "misc": 100.0 } } }` -> matches schema. All good. 
+   Final check of the prompt: "Respond in JSON format. The JSON object must exactly match the following schema:" -> I will output exactly that. No extra text. 
+   Done. 
+   [Output Generation] -> *Proceeds*
+</think>
+
+{
+    "is_fraudulent": false,
+    "suggested_value_inr": 1000.0,
+    "report": {
+        "reasoning": "The item listed as 'Test Food' with a generic description lacks specific details for precise valuation. As a fair market appraiser, I have applied standard Indian retail pricing for a typical prepared food portion (e.g., a basic meal or snack), which averages ₹100 per portion in current market conditions. For 10 portions, the total fair market value is estimated at ₹1,000. The breakdown reflects standard cost structures for retail food items in India, where ingredients constitute the largest share, followed by labour, service/overhead, and miscellaneous costs like packaging and handling.",
+        "breakdown": {
+            "ingredients": 600.0,
+            "labour": 150.0,
+            "service": 150.0,
+            "misc": 100.0
+        }
+    }
+}

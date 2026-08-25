@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
@@ -8,6 +8,7 @@ import CountdownTimer from '../../components/CountdownTimer';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
 
 export default function ShelterFeedScreen() {
+  const [activeTab, setActiveTab] = useState<'DONATION' | 'DISCOUNT'>('DONATION');
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<number | null>(null);
@@ -33,18 +34,19 @@ export default function ShelterFeedScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchFeed();
-    }, [])
+    }, [activeTab])
   );
 
   const fetchFeed = async () => {
+    setLoading(true);
     try {
       const [listingsRes, profileRes] = await Promise.all([
-        api.get('/listings/?listing_type=DONATION'),
+        api.get(`/listings/?listing_type=${activeTab}`),
         api.get('/users/me/')
       ]);
       const now = new Date().getTime();
-      const activeDonations = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
-      setFeed(activeDonations);
+      const activeListings = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      setFeed(activeListings);
 
       const profile = profileRes.data;
       if (profile.latitude && profile.longitude) {
@@ -76,7 +78,11 @@ export default function ShelterFeedScreen() {
   };
 
   const handleClaimPress = (item: any) => {
-    setEtaModalListing(item);
+    if (activeTab === 'DONATION') {
+      setEtaModalListing(item);
+    } else {
+      router.push(`/(views)/surplus/${item.id}?distance=unknown` as any);
+    }
   };
 
   const submitClaim = async (etaMins: number) => {
@@ -110,6 +116,41 @@ export default function ShelterFeedScreen() {
       ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
       : 'Distance unknown';
       
+    if (activeTab === 'DISCOUNT') {
+      return (
+        <TouchableOpacity style={styles.discountCard} activeOpacity={0.9} onPress={() => router.push(`/(views)/surplus/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+          {item.image_url ? (
+            <Image source={{ uri: item.image_url }} style={styles.image} />
+          ) : (
+            <View style={[styles.image, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{color: '#94a3b8'}}>No Image</Text>
+            </View>
+          )}
+          
+          <View style={styles.cardContent}>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.badgeDiscount}>
+                ${Number(item.discounted_price).toFixed(2)}
+              </Text>
+            </View>
+            <Text style={styles.donor}>{item.donor_name || 'Vendor'} • {distanceStr}</Text>
+            <Text style={styles.originalPrice}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+            
+            <View style={styles.footerRow}>
+              <Text style={styles.time}>
+                Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => fetchFeed()} />
+              </Text>
+              <TouchableOpacity style={[styles.button, {backgroundColor: '#0f172a'}]} onPress={() => router.push(`/(views)/surplus/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+                <Text style={styles.buttonText}>Buy Now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // DONATION card
     return (
       <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/donation/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
         <Text style={styles.title}>{item.title}</Text>
@@ -137,9 +178,22 @@ export default function ShelterFeedScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={{ paddingTop: 16 }}>
-        <Text style={styles.header}>Priority Rescue Feed</Text>
-        <Text style={styles.subtitle}>100% Free Bulk Donations</Text>
+      <View style={styles.topSection}>
+        <Text style={styles.header}>Shelter Feed</Text>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'DONATION' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('DONATION')}
+          >
+            <Text style={[styles.tabText, activeTab === 'DONATION' && styles.tabTextActive]}>NGO Donations</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.tabButton, activeTab === 'DISCOUNT' && styles.tabButtonActive]}
+            onPress={() => setActiveTab('DISCOUNT')}
+          >
+            <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.tabTextActive]}>Discounted Surplus</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {!isLocationReady ? (
@@ -155,7 +209,7 @@ export default function ShelterFeedScreen() {
           renderItem={renderItem} 
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={{ paddingBottom: 100 }}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No priority donations available right now.</Text>}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No items available right now.</Text>}
         />
       )}
 
@@ -172,14 +226,27 @@ export default function ShelterFeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#3b82f6', fontWeight: 'bold', marginBottom: 16 },
-  card: { backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, borderLeftWidth: 4, borderLeftColor: '#3b82f6' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  topSection: { paddingTop: 16, paddingHorizontal: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 12 },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#f1f5f9', borderRadius: 8, padding: 4, marginBottom: 16 },
+  tabButton: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+  tabButtonActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#64748b' },
+  tabTextActive: { color: '#0f172a' },
+  
+  card: { marginHorizontal: 16, backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, borderLeftWidth: 4, borderLeftColor: '#3b82f6', marginTop: 16 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#1e293b' },
   donor: { fontSize: 14, color: '#64748b', marginBottom: 12, marginTop: 4 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   time: { fontSize: 14, color: '#ef4444', fontWeight: '500' },
   button: { backgroundColor: '#3b82f6', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' }
+  buttonText: { color: '#fff', fontWeight: '600' },
+
+  discountCard: { marginHorizontal: 16, backgroundColor: '#ffffff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginTop: 16 },
+  image: { width: '100%', height: 160 },
+  cardContent: { padding: 16 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  badgeDiscount: { backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
+  originalPrice: { fontSize: 12, color: '#94a3b8', textDecorationLine: 'line-through', marginBottom: 12 },
 });

@@ -16,8 +16,17 @@ class User(AbstractUser):
     address = models.CharField(max_length=255, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    
     is_approved = models.BooleanField(default=False)
+    
+    APPROVAL_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+        ('BANNED', 'Banned'),
+    ]
+    approval_status = models.CharField(max_length=20, choices=APPROVAL_CHOICES, default='PENDING')
+    rejection_count = models.IntegerField(default=0)
+    rejection_reason = models.TextField(blank=True, null=True)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'role']

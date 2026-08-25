@@ -1,38 +1,82 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import api from '../../../utils/api';
 
 export default function ReceiptViewScreen() {
   const { id } = useLocalSearchParams();
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrder();
+    }, [id])
+  );
+
+  const fetchOrder = async () => {
+    try {
+      const response = await api.get(`/orders/${id}/`);
+      setOrder(response.data);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#10b981" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!order) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center' }]}>
+        <Text style={{ color: '#ef4444' }}>Receipt not found.</Text>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  const isRedeemed = order.status === 'PICKED_UP' || order.status === 'CANCELLED' || order.status === 'EXPIRED';
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Order Receipt</Text>
       
-      <View style={styles.card}>
+      <View style={[styles.card, isRedeemed && { opacity: 0.6 }]}>
         <View style={styles.qrWrapper}>
-          <QRCode value={`qr-hash-${id}`} size={150} color="#0f172a" />
+          <QRCode value={order.qr_code_id || order.id.toString()} size={150} color={isRedeemed ? '#cbd5e1' : '#0f172a'} />
         </View>
-        <Text style={styles.scanText}>Show this QR code to the vendor at pickup</Text>
+        <Text style={styles.scanText}>
+          {isRedeemed ? `Order ${order.status}` : 'Show this QR code to the vendor at pickup'}
+        </Text>
         
         <View style={styles.divider} />
         
         <View style={styles.detailRow}>
           <Text style={styles.label}>Item</Text>
-          <Text style={styles.value}>Assorted Pastries</Text>
+          <Text style={styles.value}>{order.listing_details?.title}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.label}>Vendor</Text>
-          <Text style={styles.value}>Sunrise Bakery</Text>
+          <Text style={styles.value}>{order.listing_details?.donor_name}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.label}>Status</Text>
-          <Text style={styles.statusReady}>READY FOR PICKUP</Text>
+          <Text style={[styles.statusReady, isRedeemed && { color: '#94a3b8' }]}>{order.status}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.label}>Order ID</Text>
-          <Text style={styles.value}>#ORD-{id}</Text>
+          <Text style={styles.value}>#ORD-{order.id}</Text>
         </View>
       </View>
 

@@ -7,7 +7,11 @@ import api from '../utils/api';
 interface AuthContextType {
   isAuthenticated: boolean;
   userRole: string | null;
+  userEmail: string | null;
   isApproved: boolean;
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED';
+  rejectionCount: number;
+  rejectionReason: string | null;
   login: (access: string, refresh: string) => Promise<void>;
   logout: (skipApiCall?: boolean) => Promise<void>;
   loading: boolean;
@@ -16,7 +20,11 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userRole: null,
+  userEmail: null,
   isApproved: false,
+  approvalStatus: 'PENDING',
+  rejectionCount: 0,
+  rejectionReason: null,
   login: async () => {},
   logout: async () => {},
   loading: true,
@@ -25,7 +33,11 @@ export const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+  const [approvalStatus, setApprovalStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED'>('PENDING');
+  const [rejectionCount, setRejectionCount] = useState<number>(0);
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,7 +50,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token) {
         const decoded: any = jwtDecode(token);
         setUserRole(decoded.role || null);
+        setUserEmail(decoded.email || null);
         setIsApproved(!!decoded.is_approved);
+        setApprovalStatus(decoded.approval_status || 'PENDING');
+        setRejectionCount(decoded.rejection_count || 0);
+        setRejectionReason(decoded.rejection_reason || null);
         setIsAuthenticated(true);
       }
     } catch (e) {
@@ -54,7 +70,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const decoded: any = jwtDecode(access);
     setUserRole(decoded.role || null);
+    setUserEmail(decoded.email || null);
     setIsApproved(!!decoded.is_approved);
+    setApprovalStatus(decoded.approval_status || 'PENDING');
+    setRejectionCount(decoded.rejection_count || 0);
+    setRejectionReason(decoded.rejection_reason || null);
     setIsAuthenticated(true);
   };
 
@@ -73,13 +93,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
     setUserRole(null);
+    setUserEmail(null);
     setIsApproved(false);
+    setApprovalStatus('PENDING');
+    setRejectionCount(0);
+    setRejectionReason(null);
     setIsAuthenticated(false);
     router.replace('/(auth)/login');
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userRole, isApproved, login, logout, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated, userRole, userEmail, isApproved, approvalStatus, rejectionCount, rejectionReason, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

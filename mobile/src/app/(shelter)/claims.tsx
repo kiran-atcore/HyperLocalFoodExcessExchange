@@ -9,6 +9,7 @@ import CountdownTimer from '../../components/CountdownTimer';
 export default function ShelterClaimsScreen() {
   const [claims, setClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'NGO' | 'DISCOUNT'>('NGO');
 
   useFocusEffect(
     useCallback(() => {
@@ -96,18 +97,38 @@ export default function ShelterClaimsScreen() {
     );
   };
 
+  const displayedClaims = claims.filter(c => 
+    c.listing_details?.listing_type === (activeTab === 'NGO' ? 'DONATION' : 'DISCOUNT')
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>My Claims</Text>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'NGO' && styles.activeTab]} 
+          onPress={() => setActiveTab('NGO')}
+        >
+          <Text style={[styles.tabText, activeTab === 'NGO' && styles.activeTabText]}>NGO Donations</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'DISCOUNT' && styles.activeTab]} 
+          onPress={() => setActiveTab('DISCOUNT')}
+        >
+          <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.activeTabText]}>Discounted</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color="#f59e0b" style={{ marginTop: 40 }} />
       ) : (
         <FlatList 
-          data={claims} 
+          data={displayedClaims} 
           renderItem={renderItem} 
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={styles.list}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>You have no active claims.</Text>}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>You have no active {activeTab === 'NGO' ? 'donation' : 'discount'} claims.</Text>}
         />
       )}
     </SafeAreaView>
@@ -117,6 +138,11 @@ export default function ShelterClaimsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
   header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4, marginBottom: 16 },
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+  activeTab: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: 'bold', color: '#64748b' },
+  activeTabText: { color: '#0f172a' },
   list: { paddingBottom: 24 },
   card: { 
     backgroundColor: '#ffffff', 

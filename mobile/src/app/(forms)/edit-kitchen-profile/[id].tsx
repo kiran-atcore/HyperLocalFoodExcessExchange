@@ -6,8 +6,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../../utils/api';
 import LocationBanner from '../../../components/LocationBanner';
 
+import { AuthContext } from '../../../context/AuthContext';
+
 export default function EditKitchenProfileScreen() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const id = params.id;
+  const { login } = React.useContext(AuthContext);
   const [businessName, setBusinessName] = useState('');
   const [username, setUsername] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -19,7 +23,12 @@ export default function EditKitchenProfileScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
+    if (id === 'new') {
+      setBusinessName((params.business_name as string) || '');
+      setLoading(false);
+    } else {
+      fetchProfile();
+    }
 
     const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
       if (data.address) setAddress(data.address);
@@ -53,21 +62,61 @@ export default function EditKitchenProfileScreen() {
   };
 
   const handleUpdate = async () => {
+    // Validate phone number (Indian standard: optional +91/91/0 followed by 10 digits starting with 6-9)
+    const phoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/;
+    const cleanPhone = phoneNumber.replace(/\s+/g, '');
+
+    if (id === 'new') {
+      if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
+        Alert.alert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).");
+        return;
+      }
+      if (!address.trim() || !lat || !lng) {
+        Alert.alert("Required Field", "Please select your location from the map.");
+        return;
+      }
+    } else {
+      if (cleanPhone && !phoneRegex.test(cleanPhone)) {
+        Alert.alert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
-      const payload = {
-        business_name: businessName,
-        username: username,
-        phone_number: phoneNumber,
-        address: address,
-        latitude: lat,
-        longitude: lng,
-      };
-      await api.patch('/users/me/', payload);
-      Alert.alert("Updated", "Your profile has been updated.");
+      const sanitizedUsername = username.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9@.+-_]/g, '');
+      
       if (id === 'new') {
+        await api.post('/users/register/', {
+          email: params.email,
+          password: params.password,
+          business_name: businessName,
+          username: sanitizedUsername || (params.username as string),
+          role: params.role,
+          phone_number: phoneNumber,
+          address: address,
+          latitude: lat,
+          longitude: lng,
+        });
+
+        const loginRes = await api.post('/users/login/', {
+          email: params.email,
+          password: params.password,
+        });
+        await login(loginRes.data.access, loginRes.data.refresh);
+        Alert.alert("Request Sent", "Your account is pending admin approval.");
         router.replace('/');
       } else {
+        const payload = {
+          business_name: businessName,
+          username: sanitizedUsername,
+          phone_number: phoneNumber,
+          address: address,
+          latitude: lat,
+          longitude: lng,
+        };
+        await api.patch('/users/me/', payload);
+        Alert.alert("Updated", "Your profile has been updated.");
         router.back();
       }
     } catch (e: any) {
@@ -126,7 +175,7 @@ export default function EditKitchenProfileScreen() {
             </View>
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
               <Text style={styles.label}>Phone Number</Text>
-              <TextInput style={styles.input} placeholder="e.g. +1 555-123-4567" keyboardType="phone-pad" value={phoneNumber} onChangeText={setPhoneNumber} />
+              <TextInput style={styles.input} placeholder="e.g. +91 98765 43210" keyboardType="phone-pad" value={phoneNumber} onChangeText={setPhoneNumber} />
             </View>
           </View>
 
@@ -147,7 +196,9 @@ export default function EditKitchenProfileScreen() {
 
           <TouchableOpacity style={[styles.publishBtn, isSubmitting && { opacity: 0.7 }]} onPress={handleUpdate} disabled={isSubmitting}>
             <Ionicons name="save-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.publishBtnText}>{isSubmitting ? 'Saving...' : 'Save Profile'}</Text>
+            <Text style={styles.publishBtnText}>
+              {isSubmitting ? 'Saving...' : (id === 'new' ? 'Request Access' : 'Save Profile')}
+            </Text>
           </TouchableOpacity>
 
         </ScrollView>

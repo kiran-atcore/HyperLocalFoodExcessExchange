@@ -199,14 +199,14 @@ export default function SurplusDetailScreen() {
               <View key={o.id} style={styles.orderCard}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#1e293b', marginBottom: 4 }}>
-                    Shelter: {o.requester_details?.name || `ID ${o.requester}`}
+                    {o.requester_details?.role === 'consumer' ? 'Consumer' : 'Shelter'}: {o.requester_details?.name || `ID ${o.requester}`}
                   </Text>
                   <Text style={{ color: '#64748b', fontSize: 14 }}>
                     Status: <Text style={{ fontWeight: 'bold', color: o.status === 'PICKED_UP' ? '#10b981' : ((o.status === 'CANCELLED' || o.status === 'EXPIRED') ? '#ef4444' : '#f59e0b') }}>{o.status}</Text>
                   </Text>
                   {o.status === 'CANCELLED' && o.cancelled_by_details && (
                     <Text style={{ color: '#ef4444', fontSize: 13, marginTop: 4 }}>
-                      Cancelled by: {o.cancelled_by_details.role === 'donor' ? 'You' : 'Shelter'}
+                      Cancelled by: {o.cancelled_by_details.role === 'donor' ? 'You' : (o.cancelled_by_details.role === 'consumer' ? 'Consumer' : 'Shelter')}
                     </Text>
                   )}
                 </View>

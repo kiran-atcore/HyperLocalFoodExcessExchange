@@ -135,7 +135,6 @@ export default function MapSelectionScreen() {
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
           <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search address or zip code..."
@@ -144,7 +143,13 @@ export default function MapSelectionScreen() {
               onSubmitEditing={handleSearch}
               returnKeyType="search"
             />
-            {isSearching && <ActivityIndicator size="small" color="#10b981" style={{ marginRight: 10 }} />}
+            {isSearching ? (
+              <ActivityIndicator size="small" color="#10b981" style={{ marginLeft: 8 }} />
+            ) : (
+              <TouchableOpacity onPress={handleSearch} disabled={isSearching} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -199,8 +204,8 @@ const styles = StyleSheet.create({
     height: 44,
   },
   searchIcon: {
-    marginRight: 8,
-  },
+            marginLeft: 8,
+          },
   searchInput: {
     flex: 1,
     fontSize: 16,

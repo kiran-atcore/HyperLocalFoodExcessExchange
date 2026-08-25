@@ -6,6 +6,11 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Sum
+from apps.listings.models import FoodListing
+from apps.orders.models import Order
 
 User = get_user_model()
 
@@ -61,7 +66,7 @@ class PendingApprovalsView(generics.ListAPIView):
     def get_queryset(self):
         if self.request.user.role != 'admin':
             return User.objects.none()
-        return User.objects.filter(is_approved=False).exclude(role__in=['consumer', 'admin'])
+        return User.objects.filter(approval_status='PENDING').exclude(role__in=['consumer', 'admin'])
 
 class ApproveUserView(APIView):
     permission_classes = [IsAuthenticated]
@@ -72,6 +77,7 @@ class ApproveUserView(APIView):
         try:
             user_to_approve = User.objects.get(pk=pk)
             user_to_approve.is_approved = True
+            user_to_approve.approval_status = 'APPROVED'
             user_to_approve.save()
             return Response({"message": "User approved successfully"})
         except User.DoesNotExist:
@@ -85,8 +91,106 @@ class RejectUserView(APIView):
             return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
         try:
             user_to_reject = User.objects.get(pk=pk)
-            # You can either delete the user or leave them as is_approved=False. Deleting is cleaner for a rejection.
-            user_to_reject.delete()
-            return Response({"message": "User rejected and removed"})
+            user_to_reject.is_approved = False
+            user_to_reject.rejection_count += 1
+            
+            # Save the reason provided by the admin
+            reason = request.data.get('reason', '')
+            user_to_reject.rejection_reason = reason
+            
+            if user_to_reject.rejection_count >= 3:
+                user_to_reject.approval_status = 'BANNED'
+            else:
+                user_to_reject.approval_status = 'REJECTED'
+            user_to_reject.save()
+            
+            return Response({
+                "message": f"User rejected. Rejection count: {user_to_reject.rejection_count}",
+                "approval_status": user_to_reject.approval_status
+            })
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+class ReRequestApprovalView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if user.approval_status == 'REJECTED' and user.rejection_count < 3:
+            user.approval_status = 'PENDING'
+            user.rejection_reason = None # Clear reason on re-request
+            user.save()
+            return Response({"message": "Approval re-requested successfully", "approval_status": "PENDING"})
+        return Response({"error": "Cannot re-request approval"}, status=status.HTTP_400_BAD_REQUEST)
+
+class AdminDashboardStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'admin':
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+        
+        # 1. Total Users (exclude admins, pending, banned, rejected)
+        total_users = User.objects.filter(approval_status='APPROVED').exclude(role='admin').count()
+        
+        # 2. Active Kitchens & Shelters
+        active_kitchens = User.objects.filter(role='donor', is_approved=True).count()
+        active_shelters = User.objects.filter(role='shelter', is_approved=True).count()
+        
+        # 3. Portions Saved (Sum of listing quantity for PICKED_UP orders)
+        portions_saved_agg = Order.objects.filter(status='PICKED_UP').aggregate(total=Sum('listing__quantity_available'))
+        portions_saved = portions_saved_agg['total'] or 0
+        
+        # 4. Weekly Donations (Mon-Sun for current week)
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+        
+        weekly_donations = []
+        for i in range(7):
+            day = start_of_week + timedelta(days=i)
+            # count FoodListings created on this day
+            count = FoodListing.objects.filter(created_at__date=day).count()
+            weekly_donations.append(count)
+            
+        # 5. Recent Activity
+        # Fetch 2 latest users and 2 latest food listings
+        latest_users = User.objects.order_by('-date_joined')[:2]
+        latest_listings = FoodListing.objects.order_by('-created_at')[:2]
+        
+        activities = []
+        for u in latest_users:
+            activities.append({
+                "id": f"u_{u.id}",
+                "text": f"User {u.username} registered as {u.role}",
+                "time": u.date_joined,
+                "type": "user"
+            })
+            
+        for l in latest_listings:
+            activities.append({
+                "id": f"l_{l.id}",
+                "text": f"New listing: {l.title} from {l.donor.business_name or l.donor.username}",
+                "time": l.created_at,
+                "type": "donation"
+            })
+            
+        # Sort by time descending
+        activities.sort(key=lambda x: x['time'], reverse=True)
+        
+        # Format time for UI (basic string)
+        from django.utils.timesince import timesince
+        for a in activities:
+            now = timezone.now()
+            # timesince returns string like "2 hours, 14 minutes"
+            # we can split by comma and take first part for brevity if we want, or just leave it
+            time_str = timesince(a['time'], now).split(',')[0]
+            a['time'] = f"{time_str} ago"
+            
+        return Response({
+            "total_users": total_users,
+            "active_kitchens": active_kitchens,
+            "active_shelters": active_shelters,
+            "portions_saved": portions_saved,
+            "weekly_donations": weekly_donations,
+            "recent_activity": activities
+        })

@@ -1,41 +1,232 @@
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { router } from 'expo-router';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, DeviceEventEmitter, Alert } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LocationBanner from '../../components/LocationBanner';
-
-const DUMMY_DEALS = [
-  { id: '1', title: 'Assorted Pastries', vendor: 'Sunrise Bakery', distance: '1.2 km', originalPrice: 12.0, discountedPrice: 4.5, time: 'Pickup by 6 PM', type: 'DISCOUNT', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400' },
-  { id: '2', title: 'Veggie Pizza Slices', vendor: 'Luigi\'s Pizzeria', distance: '2.5 km', originalPrice: 15.0, discountedPrice: 5.0, time: 'Pickup by 9 PM', type: 'DISCOUNT', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400' },
-];
+import api from '../../utils/api';
+import { sharedLocation } from '../../utils/sharedState';
+import CountdownTimer from '../../components/CountdownTimer';
+import EtaSelectionModal from '../../components/EtaSelectionModal';
 
 export default function ConsumerFeedScreen() {
-  const renderItem = ({ item }: any) => (
-    <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => router.push(`/(views)/deal/${item.id}` as any)}>
-      <Image source={{ uri: item.image }} style={styles.image} />
-      <View style={styles.cardContent}>
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={item.type === 'DONATION' ? styles.badgeFree : styles.badgeDiscount}>
-            {item.type === 'DONATION' ? 'FREE' : `$${item.discountedPrice.toFixed(2)}`}
-          </Text>
-        </View>
-        <Text style={styles.vendor}>{item.vendor} • {item.distance}</Text>
-        <Text style={styles.originalPrice}>Original: ${item.originalPrice.toFixed(2)}</Text>
-        <View style={styles.footerRow}>
-          <Text style={styles.time}>{item.time}</Text>
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>{item.type === 'DONATION' ? 'Reserve' : 'Buy Now'}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </TouchableOpacity>
+  const [feed, setFeed] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false); // Initially false, wait for location
+  const [isLocationReady, setIsLocationReady] = useState(false);
+  const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [displayAddress, setDisplayAddress] = useState(sharedLocation.address || '');
+  const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
+      if (data.lat && data.lng) {
+        setLocation({ lat: data.lat, lng: data.lng });
+        setDisplayAddress(data.address || '');
+        sharedLocation.lat = data.lat;
+        sharedLocation.lng = data.lng;
+        sharedLocation.address = data.address;
+        if (!isLocationReady) {
+          setIsLocationReady(true);
+          fetchFeed();
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isLocationReady]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const initFeed = async () => {
+        if (sharedLocation.lat && sharedLocation.lng) {
+          setLocation({ lat: sharedLocation.lat, lng: sharedLocation.lng });
+          setDisplayAddress(sharedLocation.address || '');
+          setIsLocationReady(true);
+        } else {
+          await fetchUserLocation();
+        }
+        fetchFeed();
+      };
+      initFeed();
+    }, [])
   );
+
+  const fetchUserLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setIsLocationReady(true);
+        return;
+      }
+      let loc;
+      try {
+        loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch (e) {
+        loc = await Location.getLastKnownPositionAsync({});
+      }
+      
+      if (loc) {
+        const lat = loc.coords.latitude;
+        const lng = loc.coords.longitude;
+        setLocation({ lat, lng });
+        sharedLocation.lat = lat;
+        sharedLocation.lng = lng;
+        
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'User-Agent': 'HyperLocalFoodExcessExchange/1.0' } });
+          const data = await response.json();
+          const address = data?.display_name || `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          setDisplayAddress(address);
+          sharedLocation.address = address;
+        } catch (e) {
+          setDisplayAddress(`GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
+      }
+    } catch (e) {}
+    setIsLocationReady(true);
+  };
+
+  const fetchFeed = async () => {
+    try {
+      setLoading(true);
+      const [listingsRes, profileRes] = await Promise.all([
+        api.get('/listings/?listing_type=DISCOUNT'),
+        api.get('/users/me/').catch(() => null)
+      ]);
+      const now = new Date().getTime();
+      const activeDeals = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      setFeed(activeDeals);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 'Unknown distance';
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const d = R * c; 
+    return d < 1 ? '< 1 km' : `${d.toFixed(1)} km`;
+  };
+
+  const submitBuyNow = async (etaMins: number) => {
+    if (!etaModalListing) return;
+    const id = etaModalListing.id;
+    setEtaModalListing(null);
+
+    try {
+      const eta = new Date(Date.now() + etaMins * 60000).toISOString();
+      const response = await api.post('/orders/', { listing: id, eta });
+      Alert.alert("Success", "Deal successfully claimed!");
+      fetchFeed();
+      router.push('/(consumer)/receipts');
+    } catch (e: any) {
+      Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim deal.");
+    }
+  };
+
+  const renderItem = ({ item }: any) => {
+    const targetLat = item.donor_latitude || item.latitude;
+    const targetLng = item.donor_longitude || item.longitude;
+    const distanceStr = location && targetLat && targetLng 
+      ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
+      : 'Distance unknown';
+
+    return (
+      <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => router.push(`/(views)/deal/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+        {item.image_url ? (
+           <Image source={{ uri: item.image_url }} style={styles.image} />
+        ) : (
+           <View style={[styles.image, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
+             <Text style={{color: '#94a3b8'}}>No Image</Text>
+           </View>
+        )}
+        
+        <View style={styles.cardContent}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.badgeDiscount}>
+              ${Number(item.discounted_price).toFixed(2)}
+            </Text>
+          </View>
+          <Text style={styles.vendor}>{item.donor_name || 'Vendor'} • {distanceStr}</Text>
+          <Text style={styles.originalPrice}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+          
+          <View style={styles.footerRow}>
+            <Text style={styles.time}>
+              Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => fetchFeed()} />
+            </Text>
+            <TouchableOpacity style={styles.button} onPress={() => setEtaModalListing(item)}>
+              <Text style={styles.buttonText}>Buy Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const handleLocationChange = (address: string, lat?: number, lng?: number) => {
+    setDisplayAddress(address);
+    if (lat && lng) {
+      setLocation({lat, lng});
+      sharedLocation.lat = lat;
+      sharedLocation.lng = lng;
+      sharedLocation.address = address;
+    }
+    // Set location ready and fetch deals (even if location failed, we load deals anyway without distance)
+    setIsLocationReady(true);
+    fetchFeed();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <LocationBanner />
+      <LocationBanner 
+        address={displayAddress} 
+        autoFetch={false} 
+        onLocationChange={handleLocationChange} 
+        onMapPress={() => {
+          const lat = location?.lat || sharedLocation.lat || 37.78825;
+          const lng = location?.lng || sharedLocation.lng || -122.4324;
+          router.push(`/(views)/map/picker?lat=${lat}&lng=${lng}` as any);
+        }}
+      />
       <Text style={styles.header}>Nearby Deals</Text>
-      <FlatList data={DUMMY_DEALS} renderItem={renderItem} keyExtractor={item => item.id} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false} />
+      
+      {!isLocationReady ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 40 }}>
+          <ActivityIndicator size="large" color="#10b981" />
+          <Text style={{ marginTop: 16, color: '#64748b', fontWeight: '500' }}>Locating you...</Text>
+        </View>
+      ) : loading ? (
+        <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList 
+          data={feed} 
+          renderItem={renderItem} 
+          keyExtractor={item => item.id.toString()} 
+          contentContainerStyle={styles.list} 
+          showsVerticalScrollIndicator={false} 
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No deals available right now.</Text>}
+        />
+      )}
+
+      {etaModalListing && (
+        <EtaSelectionModal 
+          visible={!!etaModalListing} 
+          onClose={() => setEtaModalListing(null)} 
+          onConfirm={submitBuyNow} 
+          pickupEnd={etaModalListing.pickup_end}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -50,11 +241,10 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', flex: 1 },
   badgeDiscount: { backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
-  badgeFree: { backgroundColor: '#3b82f6', color: '#fff', fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
   vendor: { fontSize: 14, color: '#64748b', marginBottom: 8 },
   originalPrice: { fontSize: 12, color: '#94a3b8', textDecorationLine: 'line-through', marginBottom: 12 },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { fontSize: 14, color: '#ef4444', fontWeight: '500' },
+  time: { fontSize: 13, color: '#ef4444', fontWeight: '500' },
   button: { backgroundColor: '#0f172a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   buttonText: { color: '#fff', fontWeight: '600' }
 });

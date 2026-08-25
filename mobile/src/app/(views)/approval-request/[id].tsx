@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../../utils/api';
+import RejectionModal from '../../../components/RejectionModal';
 
 export default function ApprovalRequestDetailScreen() {
   const { id } = useLocalSearchParams();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
 
   useEffect(() => {
     fetchUserDetails();
@@ -51,29 +53,21 @@ export default function ApprovalRequestDetailScreen() {
     );
   };
 
-  const handleReject = async () => {
-    Alert.alert(
-      "Reject User",
-      "Are you sure you want to reject this account? This action cannot be undone and will remove the account.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Reject & Delete", 
-          style: "destructive",
-          onPress: async () => {
-            setActionLoading(true);
-            try {
-              await api.post(`/users/${id}/reject/`);
-              Alert.alert("Success", "User has been rejected and removed.");
-              router.back();
-            } catch (e) {
-              Alert.alert("Error", "Failed to reject user.");
-              setActionLoading(false);
-            }
-          } 
-        }
-      ]
-    );
+  const handleReject = () => {
+    setShowRejectionModal(true);
+  };
+
+  const onConfirmReject = async (reason: string) => {
+    setActionLoading(true);
+    try {
+      await api.post(`/users/${id}/reject/`, { reason });
+      Alert.alert("Success", "User has been rejected.");
+      setShowRejectionModal(false);
+      router.back();
+    } catch (e) {
+      Alert.alert("Error", "Failed to reject user.");
+      setActionLoading(false);
+    }
   };
 
   if (loading || !user) {
@@ -134,12 +128,20 @@ export default function ApprovalRequestDetailScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Email</Text>
-            <Text style={styles.detailValue}>{user.email}</Text>
+            <TouchableOpacity onPress={() => Linking.openURL(`mailto:${user.email}`)} style={{ flex: 2, alignItems: 'flex-end' }}>
+              <Text style={styles.linkValue}>{user.email}</Text>
+            </TouchableOpacity>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Phone Number</Text>
-            <Text style={styles.detailValue}>{user.phone_number || 'N/A'}</Text>
+            {user.phone_number ? (
+              <TouchableOpacity onPress={() => Linking.openURL(`tel:${user.phone_number}`)} style={{ flex: 2, alignItems: 'flex-end' }}>
+                <Text style={styles.linkValue}>{user.phone_number}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.detailValue}>N/A</Text>
+            )}
           </View>
         </View>
 
@@ -178,6 +180,13 @@ export default function ApprovalRequestDetailScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <RejectionModal 
+        visible={showRejectionModal} 
+        onClose={() => setShowRejectionModal(false)} 
+        onConfirm={onConfirmReject} 
+        loading={actionLoading} 
+      />
     </SafeAreaView>
   );
 }
@@ -194,6 +203,7 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   detailLabel: { fontSize: 14, color: '#64748b', flex: 1 },
   detailValue: { fontSize: 14, fontWeight: '600', color: '#0f172a', flex: 2, textAlign: 'right' },
+  linkValue: { fontSize: 14, fontWeight: '600', color: '#3b82f6', textAlign: 'right', textDecorationLine: 'underline' },
   roleBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   donorBadge: { backgroundColor: '#dcfce7' },
   shelterBadge: { backgroundColor: '#e0e7ff' },

@@ -1,5 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useContext, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -22,6 +23,8 @@ export default function RegisterScreen() {
   const [role, setRole] = useState('consumer');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
@@ -32,31 +35,43 @@ export default function RegisterScreen() {
     setErrorMsg('');
     setIsLoading(true);
     try {
-      // 1. Register User
-      await api.post('/users/register/', {
-        username: data.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.floor(Math.random() * 10000),
-        business_name: data.business_name,
-        email: data.email,
-        password: data.password,
-        role: role
-      });
-      // 2. Automatically log them in after registration
-      const loginRes = await api.post('/users/login/', {
-        email: data.email,
-        password: data.password,
-      });
-      await login(loginRes.data.access, loginRes.data.refresh);
+      const generatedUsername = data.email.trim().split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.floor(Math.random() * 10000);
       
-      if (role === 'donor') {
-        router.replace('/(forms)/edit-kitchen-profile/new');
-      } else if (role === 'shelter') {
-        router.replace('/(forms)/edit-shelter-profile/new');
+      if (role === 'donor' || role === 'shelter') {
+        // Defer registration to the profile setup screen
+        const params = {
+          email: data.email.trim(),
+          password: data.password,
+          business_name: data.business_name,
+          username: generatedUsername,
+          role: role
+        };
+        
+        if (role === 'donor') {
+          router.replace({ pathname: '/(forms)/edit-kitchen-profile/new', params });
+        } else {
+          router.replace({ pathname: '/(forms)/edit-shelter-profile/new', params });
+        }
       } else {
+        // Consumers can register immediately (no profile setup required)
+        await api.post('/users/register/', {
+          username: generatedUsername,
+          business_name: data.business_name,
+          email: data.email.trim(),
+          password: data.password,
+          role: role
+        });
+        
+        const loginRes = await api.post('/users/login/', {
+          email: data.email.trim(),
+          password: data.password,
+        });
+        await login(loginRes.data.access, loginRes.data.refresh);
         router.replace('/');
       }
     } catch (err: any) {
       if (err.response?.data?.email) {
-        setErrorMsg('Email is already in use.');
+        setErrorMsg('Email is already in use. Please log in.');
       } else {
         setErrorMsg('Registration failed. Please try again.');
       }
@@ -113,7 +128,12 @@ export default function RegisterScreen() {
           name="password"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <TextInput style={[styles.input, errors.password && styles.inputError]} placeholder="Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry />
+              <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
+                <TextInput style={styles.passwordInput} placeholder="Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showPassword} />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               {errors.password && <Text style={styles.validationError}>{errors.password.message}</Text>}
             </>
           )}
@@ -124,7 +144,12 @@ export default function RegisterScreen() {
           name="confirmPassword"
           render={({ field: { onChange, onBlur, value } }) => (
             <>
-              <TextInput style={[styles.input, errors.confirmPassword && styles.inputError]} placeholder="Confirm Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry />
+              <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
+                <TextInput style={styles.passwordInput} placeholder="Confirm Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showConfirmPassword} />
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                  <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
+                </TouchableOpacity>
+              </View>
               {errors.confirmPassword && <Text style={styles.validationError}>{errors.confirmPassword.message}</Text>}
             </>
           )}
@@ -156,6 +181,9 @@ const styles = StyleSheet.create({
   roleTextActive: { color: '#0f172a' },
   inputContainer: { marginBottom: 24 },
   input: { backgroundColor: '#ffffff', padding: 16, borderRadius: 12, marginBottom: 16, fontSize: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  passwordInput: { flex: 1, padding: 16, fontSize: 16 },
+  eyeIcon: { padding: 16 },
   inputError: { borderColor: '#ef4444' },
   button: { backgroundColor: '#3b82f6', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 16 },
   buttonText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },

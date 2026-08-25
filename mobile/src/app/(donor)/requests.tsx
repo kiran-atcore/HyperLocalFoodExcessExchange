@@ -9,6 +9,7 @@ import CountdownTimer from '../../components/CountdownTimer';
 export default function DonorRequestsScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'SHELTER' | 'CONSUMER'>('SHELTER');
 
   useFocusEffect(
     useCallback(() => {
@@ -66,16 +67,38 @@ export default function DonorRequestsScreen() {
     );
   };
 
+  const displayedOrders = orders.filter(o => 
+    o.requester_details?.role === (activeTab === 'SHELTER' ? 'shelter' : 'consumer')
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Incoming Pickups</Text>
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'SHELTER' && styles.activeTab]} 
+          onPress={() => setActiveTab('SHELTER')}
+        >
+          <Text style={[styles.tabText, activeTab === 'SHELTER' && styles.activeTabText]}>NGOs / Shelters</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'CONSUMER' && styles.activeTab]} 
+          onPress={() => setActiveTab('CONSUMER')}
+        >
+          <Text style={[styles.tabText, activeTab === 'CONSUMER' && styles.activeTabText]}>Consumers</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
-      ) : orders.length === 0 ? (
-        <Text style={{ textAlign: 'center', marginTop: 40, color: '#64748b' }}>No incoming pickups at the moment.</Text>
+      ) : displayedOrders.length === 0 ? (
+        <Text style={{ textAlign: 'center', marginTop: 40, color: '#64748b' }}>
+          No incoming pickups from {activeTab === 'SHELTER' ? 'shelters' : 'consumers'}.
+        </Text>
       ) : (
         <FlatList 
-          data={orders} 
+          data={displayedOrders} 
           renderItem={renderItem} 
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={styles.list}
@@ -88,6 +111,11 @@ export default function DonorRequestsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
   header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16, marginTop: 16 },
+  tabContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4, marginBottom: 16 },
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+  activeTab: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1, elevation: 2 },
+  tabText: { fontSize: 14, fontWeight: 'bold', color: '#64748b' },
+  activeTabText: { color: '#0f172a' },
   list: { paddingBottom: 24 },
   card: { backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, borderLeftWidth: 4 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },

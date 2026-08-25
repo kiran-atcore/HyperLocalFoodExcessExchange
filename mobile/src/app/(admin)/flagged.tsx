@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, router } from 'expo-router';
 import api from '../../utils/api';
+import { AuthContext } from '../../context/AuthContext';
 
 export default function AdminFlaggedScreen() {
   const [receipts, setReceipts] = useState<any[]>([]);
@@ -36,10 +37,16 @@ export default function AdminFlaggedScreen() {
     );
   }
 
+  const { logout } = React.useContext(AuthContext);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Flagged Donations</Text>
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => logout(false)}>
+          <Ionicons name="log-out-outline" size={20} color="#ef4444" />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
       </View>
       <ScrollView style={styles.content}>
         {receipts.length === 0 ? (
@@ -79,8 +86,10 @@ export default function AdminFlaggedScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f172a' },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#fca5a5' },
+  logoutText: { color: '#ef4444', fontWeight: 'bold', marginLeft: 4, fontSize: 13 },
   content: { padding: 16 },
   emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 64 },
   emptyText: { marginTop: 16, fontSize: 16, color: '#64748b' },

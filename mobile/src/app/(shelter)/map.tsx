@@ -21,12 +21,15 @@ export default function ShelterMapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (sharedLocation.lat && sharedLocation.lng) {
-        setUserLocation({ lat: sharedLocation.lat, lng: sharedLocation.lng });
-      } else {
-        fetchUserLocation();
-      }
-      fetchDonations();
+      const initMap = async () => {
+        if (sharedLocation.lat && sharedLocation.lng) {
+          setUserLocation({ lat: sharedLocation.lat, lng: sharedLocation.lng });
+        } else {
+          await fetchUserLocation();
+        }
+        fetchDonations();
+      };
+      initMap();
     }, [])
   );
 
