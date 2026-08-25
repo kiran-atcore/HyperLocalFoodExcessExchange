@@ -12,11 +12,17 @@ export default function DonorScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [permission, requestPermission] = useCameraPermissions();
+  const isFocusedRef = React.useRef(true);
 
   useFocusEffect(
     useCallback(() => {
+      isFocusedRef.current = true;
       setScanned(false);
       setIsScanning(false);
+      
+      return () => {
+        isFocusedRef.current = false;
+      };
     }, [])
   );
 
@@ -49,8 +55,11 @@ export default function DonorScanScreen() {
     setIsScanning(true);
     try {
       const response = await api.post(`/orders/complete_qr/`, { qr_code_id: targetOrderId });
+      if (!isFocusedRef.current) return;
       router.push(`/(views)/success/${response.data.order_id}` as any);
     } catch (e: any) {
+      if (!isFocusedRef.current) return;
+      
       let errorMsg = "Could not verify QR code. Please ensure this is a valid pickup code.";
       if (e.response?.status === 404) {
         errorMsg = "Invalid or unrecognized QR code. This order could not be found.";
@@ -69,7 +78,9 @@ export default function DonorScanScreen() {
         ]
       );
     } finally {
-      setIsScanning(false);
+      if (isFocusedRef.current) {
+        setIsScanning(false);
+      }
     }
   };
 

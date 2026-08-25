@@ -7,6 +7,7 @@ import api from '../utils/api';
 interface AuthContextType {
   isAuthenticated: boolean;
   userRole: string | null;
+  isApproved: boolean;
   login: (access: string, refresh: string) => Promise<void>;
   logout: (skipApiCall?: boolean) => Promise<void>;
   loading: boolean;
@@ -15,6 +16,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userRole: null,
+  isApproved: false,
   login: async () => {},
   logout: async () => {},
   loading: true,
@@ -23,6 +25,7 @@ export const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token) {
         const decoded: any = jwtDecode(token);
         setUserRole(decoded.role || null);
+        setIsApproved(!!decoded.is_approved);
         setIsAuthenticated(true);
       }
     } catch (e) {
@@ -50,6 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const decoded: any = jwtDecode(access);
     setUserRole(decoded.role || null);
+    setIsApproved(!!decoded.is_approved);
     setIsAuthenticated(true);
   };
 
@@ -68,12 +73,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
     setUserRole(null);
+    setIsApproved(false);
     setIsAuthenticated(false);
     router.replace('/(auth)/login');
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userRole, login, logout, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated, userRole, isApproved, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

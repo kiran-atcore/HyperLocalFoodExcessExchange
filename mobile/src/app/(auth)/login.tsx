@@ -18,10 +18,16 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { control, handleSubmit, formState: { errors } } = useForm({
+  const { control, handleSubmit, formState: { errors }, setValue } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { email: '', password: '' }
   });
+
+  const handleAdminLogin = () => {
+    setValue('email', 'kiranchand.0987@gmail.com');
+    setValue('password', 'Kiran@Kirra@1234');
+    handleSubmit(onSubmit)();
+  };
 
   const onSubmit = async (data: any) => {
     setErrorMsg('');
@@ -93,6 +99,10 @@ export default function LoginScreen() {
 
       <TouchableOpacity style={styles.linkButton} onPress={() => router.push('/(auth)/register')}>
         <Text style={styles.linkText}>Don't have an account? Sign up</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={[styles.linkButton, { marginTop: 24 }]} onPress={handleAdminLogin}>
+        <Text style={[styles.linkText, { color: '#64748b' }]}>Admin Access</Text>
       </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>

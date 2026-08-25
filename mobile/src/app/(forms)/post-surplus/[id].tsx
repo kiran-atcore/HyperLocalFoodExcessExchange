@@ -23,6 +23,8 @@ export default function PostSurplusScreen() {
   const [userAddress, setUserAddress] = useState('');
   const [pickupEnd, setPickupEnd] = useState(new Date(new Date().getTime() + 24 * 60 * 60 * 1000));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [aiEstimate, setAiEstimate] = useState<string | null>(null);
+  const [isEstimating, setIsEstimating] = useState(false);
 
   const handleOpenPicker = () => {
     if (Platform.OS === 'android') {
@@ -65,6 +67,32 @@ export default function PostSurplusScreen() {
     };
     fetchProfile();
   }, []);
+
+  const handleGetEstimate = async () => {
+    if (!title) {
+      Alert.alert("Missing Info", "Please enter a title to get an AI estimate.");
+      return;
+    }
+    setIsEstimating(true);
+    try {
+      const response = await api.post('/listings/estimate_value/', {
+        title,
+        description,
+        quantity_available: parseInt(quantity) || 1,
+        quantity_unit: quantityUnit
+      });
+      const suggestedVal = response.data.suggested_value_inr;
+      setAiEstimate(suggestedVal.toString());
+      if (!originalPrice || originalPrice === '0.00' || originalPrice === '0') {
+        setOriginalPrice(suggestedVal.toString());
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to get AI estimate");
+    } finally {
+      setIsEstimating(false);
+    }
+  };
 
   const handlePublish = async () => {
     setIsSubmitting(true);
@@ -194,8 +222,15 @@ export default function PostSurplusScreen() {
           <View style={styles.card}>
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: isDonation ? 0 : 8 }]}>
-                <Text style={styles.label}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
+                  <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
+                    <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>
+                  </TouchableOpacity>
+                </View>
                 <TextInput style={styles.input} placeholder="0.00" keyboardType="decimal-pad" value={originalPrice} onChangeText={setOriginalPrice} />
+                {aiEstimate && <Text style={{ color: '#10b981', fontSize: 12, marginTop: 4 }}>AI Suggested Max: ₹{aiEstimate}</Text>}
+                {isDonation && <Text style={{ color: '#f59e0b', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>Note: Exaggerated values will be automatically flagged for admin review.</Text>}
               </View>
               {!isDonation && (
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>

@@ -153,6 +153,36 @@ export default function SurplusDetailScreen() {
           </View>
         </View>
 
+        {listing.listing_type === 'DONATION' && (
+          <>
+            <Text style={styles.sectionTitle}>Tax Valuation</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Your Claimed Value:</Text>
+                <Text style={styles.infoValue}>₹{listing.estimated_fmv}</Text>
+              </View>
+              {listing.ai_suggested_value != null && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>AI Suggested Value:</Text>
+                  <Text style={styles.infoValue}>₹{listing.ai_suggested_value}</Text>
+                </View>
+              )}
+              <View style={[styles.infoRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                <Text style={styles.infoLabel}>Status:</Text>
+                {listing.is_ai_flagged ? (
+                  <View style={{ backgroundColor: '#fffbeb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#fde68a' }}>
+                    <Text style={{ color: '#d97706', fontWeight: 'bold', fontSize: 12 }}>Flagged for Review</Text>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: '#a7f3d0' }}>
+                    <Text style={{ color: '#059669', fontWeight: 'bold', fontSize: 12 }}>Verified</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </>
+        )}
+
         {listing.additional_details ? (
           <>
             <Text style={styles.sectionTitle}>Additional Details</Text>

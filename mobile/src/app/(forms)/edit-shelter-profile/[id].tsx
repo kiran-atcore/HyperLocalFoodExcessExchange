@@ -65,7 +65,11 @@ export default function EditShelterProfileScreen() {
       };
       await api.patch('/users/me/', payload);
       Alert.alert("Updated", "Your organization profile has been updated.");
-      router.back();
+      if (id === 'new') {
+        router.replace('/');
+      } else {
+        router.back();
+      }
     } catch (e: any) {
       console.error(e.response?.data || e.message);
       Alert.alert("Error", "Failed to update profile");

@@ -27,7 +27,7 @@ export default function DonorTaxScreen() {
     }
   };
 
-  const totalValue = receipts.reduce((sum, r) => sum + parseFloat(r.estimated_value || '0'), 0).toFixed(2);
+  const totalValue = receipts.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + parseFloat(r.estimated_value || '0'), 0).toFixed(2);
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -55,13 +55,23 @@ export default function DonorTaxScreen() {
           <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 20 }}>No tax receipts yet. When a shelter picks up a donation, receipts appear here.</Text>
         ) : (
           receipts.map((receipt) => (
-            <View key={receipt.id} style={styles.card}>
+            <View key={receipt.id} style={[styles.card, receipt.status === 'PENDING' && { borderLeftColor: '#f59e0b' }, receipt.status === 'REJECTED' && { borderLeftColor: '#ef4444' }]}>
               <View style={styles.cardHeader}>
                 <Text style={styles.date}>{new Date(receipt.created_at).toLocaleDateString()}</Text>
-                <Text style={styles.value}>₹{receipt.estimated_value}</Text>
+                <Text style={[styles.value, receipt.status === 'PENDING' && { color: '#d97706' }, receipt.status === 'REJECTED' && { color: '#ef4444', textDecorationLine: 'line-through' }]}>₹{receipt.estimated_value}</Text>
               </View>
               <Text style={styles.item}>{receipt.listing_title}</Text>
               <Text style={styles.ngo}>To: {receipt.ngo_name}</Text>
+              {receipt.status === 'PENDING' && (
+                <View style={{ marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fffbeb', borderRadius: 4, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: '#d97706', fontSize: 12, fontWeight: 'bold' }}>Pending for admin approval</Text>
+                </View>
+              )}
+              {receipt.status === 'REJECTED' && (
+                <View style={{ marginTop: 8, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#fef2f2', borderRadius: 4, alignSelf: 'flex-start' }}>
+                  <Text style={{ color: '#ef4444', fontSize: 12, fontWeight: 'bold' }}>Rejected</Text>
+                </View>
+              )}
             </View>
           ))
         )}

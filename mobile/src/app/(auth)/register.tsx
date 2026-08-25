@@ -46,7 +46,14 @@ export default function RegisterScreen() {
         password: data.password,
       });
       await login(loginRes.data.access, loginRes.data.refresh);
-      router.replace('/');
+      
+      if (role === 'donor') {
+        router.replace('/(forms)/edit-kitchen-profile/new');
+      } else if (role === 'shelter') {
+        router.replace('/(forms)/edit-shelter-profile/new');
+      } else {
+        router.replace('/');
+      }
     } catch (err: any) {
       if (err.response?.data?.email) {
         setErrorMsg('Email is already in use.');

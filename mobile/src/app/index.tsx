@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function EntryScreen() {
-  const { isAuthenticated, userRole, loading } = useContext(AuthContext);
+  const { isAuthenticated, userRole, isApproved, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
@@ -19,6 +19,12 @@ export default function EntryScreen() {
   }
 
   // Redirect based on role
+  if (userRole === 'admin') return <Redirect href="/(admin)" />;
+  
+  if (!isApproved && (userRole === 'donor' || userRole === 'shelter')) {
+    return <Redirect href="/(views)/approval-pending/new" />;
+  }
+
   if (userRole === 'donor') return <Redirect href="/(donor)" />;
   if (userRole === 'shelter') return <Redirect href="/(shelter)" />;
   

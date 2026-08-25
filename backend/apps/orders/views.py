@@ -88,6 +88,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     'ngo': order.requester,
                     'listing': order.listing,
                     'estimated_value': order.listing.estimated_fmv,
+                    'status': 'PENDING' if order.listing.is_ai_flagged else 'APPROVED'
                 }
             )
 
@@ -134,6 +135,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     'ngo': order.requester,
                     'listing': order.listing,
                     'estimated_value': order.listing.estimated_fmv,
+                    'status': 'PENDING' if order.listing.is_ai_flagged else 'APPROVED'
                 }
             )
 

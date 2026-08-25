@@ -11,12 +11,13 @@ class FoodListing(models.Model):
     description = models.TextField()
     listing_type = models.CharField(max_length=20, choices=ListingType.choices, default=ListingType.DISCOUNT)
     
-    original_price = models.DecimalField(max_digits=6, decimal_places=2)
-    discounted_price = models.DecimalField(max_digits=6, decimal_places=2, default=0.00)
-    estimated_fmv = models.DecimalField(max_digits=6, decimal_places=2, help_text="Fair Market Value for Tax Receipt")
+    original_price = models.DecimalField(max_digits=8, decimal_places=2)
+    discounted_price = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
+    estimated_fmv = models.DecimalField(max_digits=8, decimal_places=2, help_text="Fair Market Value for Tax Receipt")
     
     is_ai_flagged = models.BooleanField(default=False)
-    ai_suggested_value = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    ai_suggested_value = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    ai_valuation_report = models.JSONField(null=True, blank=True, help_text="Detailed AI valuation breakdown")
     
     quantity_available = models.PositiveIntegerField(default=1)
     quantity_unit = models.CharField(max_length=20, default='portions')

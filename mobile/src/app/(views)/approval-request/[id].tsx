@@ -1,0 +1,208 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import api from '../../../utils/api';
+
+export default function ApprovalRequestDetailScreen() {
+  const { id } = useLocalSearchParams();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    fetchUserDetails();
+  }, [id]);
+
+  const fetchUserDetails = async () => {
+    try {
+      const response = await api.get(`/users/${id}/`);
+      setUser(response.data);
+    } catch (e) {
+      Alert.alert("Error", "Could not load user details");
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    Alert.alert(
+      "Approve User",
+      "Are you sure you want to approve this account? They will gain full access to the platform.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Approve", 
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              await api.post(`/users/${id}/approve/`);
+              Alert.alert("Success", "User has been approved.");
+              router.back();
+            } catch (e) {
+              Alert.alert("Error", "Failed to approve user.");
+              setActionLoading(false);
+            }
+          } 
+        }
+      ]
+    );
+  };
+
+  const handleReject = async () => {
+    Alert.alert(
+      "Reject User",
+      "Are you sure you want to reject this account? This action cannot be undone and will remove the account.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Reject & Delete", 
+          style: "destructive",
+          onPress: async () => {
+            setActionLoading(true);
+            try {
+              await api.post(`/users/${id}/reject/`);
+              Alert.alert("Success", "User has been rejected and removed.");
+              router.back();
+            } catch (e) {
+              Alert.alert("Error", "Failed to reject user.");
+              setActionLoading(false);
+            }
+          } 
+        }
+      ]
+    );
+  };
+
+  if (loading || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#0f172a" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Review Request</Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <ActivityIndicator size="large" color="#1e40af" style={{ marginTop: 40 }} />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#0f172a" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Review Request</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="business" size={20} color="#1e40af" style={{ marginRight: 8 }} />
+            <Text style={styles.sectionTitle}>Account Information</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Type</Text>
+            <View style={[styles.roleBadge, user.role === 'donor' ? styles.donorBadge : styles.shelterBadge]}>
+              <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Organization Name</Text>
+            <Text style={styles.detailValue}>{user.business_name || 'N/A'}</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Internal Manager Name</Text>
+            <Text style={styles.detailValue}>{user.username || 'N/A'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="call" size={20} color="#1e40af" style={{ marginRight: 8 }} />
+            <Text style={styles.sectionTitle}>Contact Details</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Email</Text>
+            <Text style={styles.detailValue}>{user.email}</Text>
+          </View>
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Phone Number</Text>
+            <Text style={styles.detailValue}>{user.phone_number || 'N/A'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="location" size={20} color="#1e40af" style={{ marginRight: 8 }} />
+            <Text style={styles.sectionTitle}>Location</Text>
+          </View>
+          
+          <Text style={styles.addressText}>{user.address || 'No address provided'}</Text>
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.actionBtn, styles.rejectBtn, actionLoading && { opacity: 0.5 }]} 
+          onPress={handleReject}
+          disabled={actionLoading}
+        >
+          <Ionicons name="close-circle-outline" size={20} color="#dc2626" style={{ marginRight: 6 }} />
+          <Text style={styles.rejectBtnText}>Reject</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.actionBtn, styles.approveBtn, actionLoading && { opacity: 0.5 }]} 
+          onPress={handleApprove}
+          disabled={actionLoading}
+        >
+          {actionLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={styles.approveBtnText}>Approve Account</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
+  backBtn: { padding: 4 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
+  content: { padding: 16, paddingBottom: 40 },
+  card: { backgroundColor: '#ffffff', borderRadius: 12, padding: 16, marginBottom: 16, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  detailLabel: { fontSize: 14, color: '#64748b', flex: 1 },
+  detailValue: { fontSize: 14, fontWeight: '600', color: '#0f172a', flex: 2, textAlign: 'right' },
+  roleBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  donorBadge: { backgroundColor: '#dcfce7' },
+  shelterBadge: { backgroundColor: '#e0e7ff' },
+  roleText: { fontSize: 10, fontWeight: 'bold', color: '#0f172a' },
+  addressText: { fontSize: 14, color: '#0f172a', lineHeight: 20 },
+  footer: { flexDirection: 'row', padding: 16, backgroundColor: '#ffffff', borderTopWidth: 1, borderTopColor: '#e2e8f0' },
+  actionBtn: { flex: 1, flexDirection: 'row', paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rejectBtn: { backgroundColor: '#fee2e2', marginRight: 8 },
+  rejectBtnText: { color: '#dc2626', fontSize: 16, fontWeight: 'bold' },
+  approveBtn: { backgroundColor: '#10b981', marginLeft: 8 },
+  approveBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
+});

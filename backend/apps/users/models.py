@@ -5,6 +5,7 @@ class RoleType(models.TextChoices):
     DONOR = 'donor', 'Kitchen/Donor'
     SHELTER = 'shelter', 'Shelter/NGO'
     CONSUMER = 'consumer', 'Consumer'
+    ADMIN = 'admin', 'Admin'
 
 class User(AbstractUser):
     role = models.CharField(max_length=20, choices=RoleType.choices, default=RoleType.CONSUMER)
@@ -15,6 +16,8 @@ class User(AbstractUser):
     address = models.CharField(max_length=255, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    
+    is_approved = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'role']
