@@ -102,6 +102,10 @@ export default function RequestDetailScreen() {
             <Text style={styles.infoValue}>{order.listing_details?.title}</Text>
           </View>
           <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Quantity:</Text>
+            <Text style={styles.infoValue}>{order.quantity || 1} {order.listing_details?.quantity_unit || 'portions'} claimed</Text>
+          </View>
+          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Estimated Arrival:</Text>
             <Text style={styles.infoValueTime}>{order.eta ? new Date(order.eta).toLocaleTimeString() : 'No ETA'}</Text>
           </View>

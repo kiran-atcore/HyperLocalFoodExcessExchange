@@ -53,7 +53,7 @@ export default function ShelterMapScreen() {
 
   const fetchDonations = async () => {
     try {
-      const response = await api.get('/listings/?listing_type=DONATION');
+      const response = await api.get('/listings/');
       const now = new Date().getTime();
       const activeDonations = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
       setDonations(activeDonations);
@@ -72,17 +72,25 @@ export default function ShelterMapScreen() {
     }
   };
 
-  const submitClaim = async (etaMins: number) => {
+  const submitClaim = async (etaMins: number, quantity: number = 1) => {
     if (!etaModalListing) return;
     const id = etaModalListing.id;
     setEtaModalListing(null);
 
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
-      const response = await api.post('/orders/', { listing: id, eta });
-      Alert.alert("Success", "Donation successfully claimed!");
+      const response = await api.post('/orders/', { 
+        listing: id, 
+        eta, 
+        quantity: etaModalListing.listing_type === 'DISCOUNT' ? quantity : undefined 
+      });
+      Alert.alert("Success", "Successfully claimed!");
       fetchDonations(); // refresh map data
-      router.push(`/(views)/claim/${response.data.id}` as any);
+      if (etaModalListing.listing_type === 'DISCOUNT') {
+        router.push(`/(views)/receipt/${response.data.id}` as any);
+      } else {
+        router.push(`/(views)/claim/${response.data.id}` as any);
+      }
     } catch (e: any) {
       Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim donation.");
     }
@@ -93,6 +101,8 @@ export default function ShelterMapScreen() {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'claim' && data.id) {
         handleClaimPress(data.id);
+      } else if (data.type === 'view' && data.id) {
+        router.push(`/(views)/deal/${data.id}` as any);
       }
     } catch (e) {
       console.error('Failed to parse webview message', e);
@@ -127,18 +137,25 @@ export default function ShelterMapScreen() {
   };
 
   const markersJs = filteredDonations.map(item => {
-    const color = '#3b82f6';
+    const color = item.listing_type === 'DONATION' ? '#3b82f6' : '#10b981';
     const targetLat = item.donor_latitude || item.latitude;
     const targetLng = item.donor_longitude || item.longitude;
     const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
+    
+    const badgeHtml = item.listing_type === 'DONATION' 
+      ? '<span style="font-size: 10px; background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block;">NGO Donation</span>'
+      : '<span style="font-size: 10px; background: #dcfce7; color: #065f46; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block;">Discounted Surplus</span>';
+    
+    const buttonText = item.is_claimed ? 'Already Claimed' : (item.listing_type === 'DONATION' ? 'Claim for NGO' : 'Buy Now');
+    const displayPrice = item.listing_type === 'DONATION' ? 'FREE' : `₹${item.discounted_price}`;
     
     return `
       var m_${item.id} = L.marker([${targetLat || 37.78825}, ${targetLng || -122.4324}]).addTo(map);
       mapMarkers[${item.id}] = m_${item.id};
       markerExpirations[${item.id}] = '${item.pickup_end || ''}';
-      m_${item.id}.bindPopup('<div style="font-family: sans-serif; text-align: center;"><b>${item.title.replace(/'/g, "\\'")}</b><br/><span style="color: #64748b;">${(item.donor_name || 'Donor').replace(/'/g, "\\'")}</span><br/><small style="color: ${color}; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><small style="color: #64748b;">Qty: ${item.quantity_available} ${item.quantity_unit}</small><br/><button ${item.is_claimed ? 'disabled' : ''} onclick="handleClaimClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: ${item.is_claimed ? '#94a3b8' : '#3b82f6'}; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">${item.is_claimed ? 'Already Claimed' : 'Claim for NGO'}</button></div>');
+      m_${item.id}.bindPopup('<div onclick="handleCardClick(${item.id})" style="font-family: sans-serif; text-align: center; cursor: pointer;"><b>${item.title.replace(/'/g, "\\'")}</b><br/>${badgeHtml}<br/><span style="color: #64748b;">${(item.donor_name || 'Donor').replace(/'/g, "\\'")}</span><br/><span style="color: ${color}; font-weight: bold; font-size: 14px;">${displayPrice}</span><br/><small style="color: ${color}; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><small style="color: #64748b;">Qty: ${item.quantity_available} ${item.quantity_unit}</small><br/><button ${item.is_claimed ? 'disabled' : ''} onclick="event.stopPropagation(); handleClaimClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: ${item.is_claimed ? '#94a3b8' : color}; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">${buttonText}</button></div>');
     `;
-  }).join('\n');
+  }).join('\\n');
 
   const leafletHtml = `
     <!DOCTYPE html>
@@ -196,6 +213,10 @@ export default function ShelterMapScreen() {
 
         function handleClaimClick(id) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type: 'claim', id: id}));
+        }
+
+        function handleCardClick(id) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type: 'view', id: id}));
         }
 
         // Live Countdown Timer Logic for Popups
@@ -280,6 +301,8 @@ export default function ShelterMapScreen() {
           onClose={() => setEtaModalListing(null)} 
           onConfirm={submitClaim} 
           pickupEnd={etaModalListing.pickup_end}
+          showQuantity={etaModalListing.listing_type === 'DISCOUNT'}
+          maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
         />
       )}
     </SafeAreaView>

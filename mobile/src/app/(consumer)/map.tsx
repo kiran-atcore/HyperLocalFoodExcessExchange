@@ -72,23 +72,29 @@ export default function ConsumerMapScreen() {
         if (listing) {
           setEtaModalListing(listing);
         }
+      } else if (data.type === 'view' && data.id) {
+        router.push(`/(views)/deal/${data.id}` as any);
       }
     } catch (e) {
       console.error('Failed to parse webview message', e);
     }
   };
 
-  const submitBuyNow = async (etaMins: number) => {
+  const submitBuyNow = async (etaMins: number, quantity: number) => {
     if (!etaModalListing) return;
     const id = etaModalListing.id;
     setEtaModalListing(null);
 
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
-      const response = await api.post('/orders/', { listing: id, eta });
+      const response = await api.post('/orders/', { listing: id, eta, quantity });
       Alert.alert("Success", "Deal successfully claimed!");
       fetchDeals(); // refresh map
-      router.push('/(consumer)/receipts');
+      if (response.data && response.data.id) {
+        router.push(`/(views)/receipt/${response.data.id}` as any);
+      } else {
+        router.push('/(consumer)/receipts');
+      }
     } catch (error: any) {
       Alert.alert("Claim Failed", error.response?.data?.error || "Unable to claim deal.");
     }
@@ -133,7 +139,7 @@ export default function ConsumerMapScreen() {
       var m_${item.id} = L.marker([${targetLat || 37.78825}, ${targetLng || -122.4324}]).addTo(map);
       mapMarkers[${item.id}] = m_${item.id};
       markerExpirations[${item.id}] = '${item.pickup_end || ''}';
-      m_${item.id}.bindPopup('<div style="font-family: sans-serif; text-align: center;"><b>${item.title.replace(/'/g, "\\'")}</b><br/><span style="color: #64748b;">${(item.donor_name || 'Vendor').replace(/'/g, "\\'")}</span><br/><span style="color: ${color}; font-weight: bold;">${displayPrice}</span><br/><small style="color: #64748b; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><button onclick="handleBuyClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: #0f172a; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">Buy Now</button></div>');
+      m_${item.id}.bindPopup('<div onclick="handleCardClick(${item.id})" style="font-family: sans-serif; text-align: center; cursor: pointer;"><b>${item.title.replace(/'/g, "\\'")}</b><br/><span style="color: #64748b;">${(item.donor_name || 'Vendor').replace(/'/g, "\\'")}</span><br/><span style="color: ${color}; font-weight: bold;">${displayPrice}</span><br/><small style="color: #64748b; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><button onclick="event.stopPropagation(); handleBuyClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: #0f172a; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">Buy Now</button></div>');
     `;
   }).join('\n');
 
@@ -193,6 +199,10 @@ export default function ConsumerMapScreen() {
 
         function handleBuyClick(id) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type: 'buy', id: id}));
+        }
+
+        function handleCardClick(id) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type: 'view', id: id}));
         }
 
         // Live Countdown Timer Logic for Popups
@@ -277,6 +287,8 @@ export default function ConsumerMapScreen() {
           onClose={() => setEtaModalListing(null)} 
           onConfirm={submitBuyNow} 
           pickupEnd={etaModalListing.pickup_end}
+          showQuantity={true}
+          maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
         />
       )}
     </SafeAreaView>

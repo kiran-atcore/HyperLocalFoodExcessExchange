@@ -10,3 +10,49 @@ Result: {'is_fraudulent': False, 'suggested_value_inr': 25000.0, 'report': {'rea
 
 [SUCCESS] Title: test | Qty: 1 portions
 Result: {'is_fraudulent': False, 'suggested_value_inr': 150.0, 'report': {'reasoning': '...', 'breakdown': {'ingredients': 60.0, 'labour': 40.0, 'service': 30.0, 'misc': 20.0}}}
+
+[SUCCESS] Title: Burger | Qty: 1 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 375.0, 'report': {'reasoning': "Based on standard Indian retail pricing for specialty burgers, a beef burger with extra cheese layers and creamy sauce typically falls in the ₹300–₹450 range. Beef is a niche protein in India, primarily available in specific regions and premium outlets, which commands a higher price point. The 'extra cheese' and 'creamy sauce' additions justify positioning the value toward the upper mid-range. A fair market value of ₹375 aligns with current restaurant retail rates for a single premium portion. The breakdown reflects standard food service cost allocation: ingredients (~42%), labour (~19%), service/overhead (~23%), and miscellaneous/packaging/margin (~16%). This valuation complies with 80G donation appraisal guidelines requiring prevailing retail market value.", 'breakdown': {'ingredients': 157.5, 'labour': 71.25, 'service': 86.25, 'misc': 60.0}}}
+
+[SUCCESS] Title: Burger | Qty: 10 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 3500.0, 'report': {'reasoning': '...', 'breakdown': {'ingredients': 1500.0, 'labour': 500.0, 'service': 1000.0, 'misc': 500.0}}}
+
+[SUCCESS] Title: burger | Qty: 10 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 0.0, 'report': {'reasoning': 'string', 'breakdown': {'ingredients': 0.0, 'labour': 0.0, 'service': 0.0, 'misc': 0.0}}}
+
+[SUCCESS] Title: Burger | Qty: 10 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 1800.0, 'report': {'reasoning': '...', 'breakdown': {'ingredients': 810.0, 'labour': 450.0, 'service': 360.0, 'misc': 180.0}}}
+
+[ERROR] Title: pizza | Exception: Unterminated string starting at: line 5 column 22 (char 102)
+Raw result_str: {
+    "is_fraudulent": false,
+    "suggested_value_inr": 4500.0,
+    "report": {
+        "reasoning": "The fair market value is calculated based on standard Indian retail pricing for a standard chicken pizza, which typically ranges between ₹350 and ₹550 per portion across major chains and local pizzerias. An average retail price of ₹450 per portion is applied. For 10 portions, the total fair market value is ₹4,500. The breakdown reflects a typical restaurant cost structure: ingredients (45%), labour (20%), service and operational overhead (20%), and miscellaneous costs including packaging, taxes, and prep fees (15%). This valuation aligns with standard
+
+[SUCCESS] Title: pizza | Qty: 11 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 4950.0, 'report': {'reasoning': 'The fair market value is estimated based on standard Indian retail pricing for a chicken pizza. In major Indian cities, a standard chicken pizza (medium/large or individual serving) typically retails between ₹400 and ₹500. Using a conservative average of ₹450 per portion, the total value for 11 portions is ₹4,950. This aligns with typical restaurant menu pricing and is appropriate for 80G tax receipt valuation, which requires fair market value rather than production cost. The breakdown reflects standard Indian restaurant cost allocation: ingredients (~45%), labour (~25%), service/overhead (~15%), and miscellaneous/packaging (~15%).', 'breakdown': {'ingredients': 2227.5, 'labour': 1237.5, 'service': 742.5, 'misc': 742.5}}}
+
+[SUCCESS] Title: pizza | Qty: 9 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 4050.0, 'report': {'reasoning': 'Based on standard Indian retail pricing across mid-tier restaurants and cloud kitchens, a standard chicken pizza portion typically ranges between ₹350 and ₹550. Using a conservative average of ₹450 per portion, the fair market value for 9 portions is ₹4,050. The cost breakdown follows typical Indian F&B industry margins: ingredients (~45%), labour (~25%), service/overhead (~15%), and miscellaneous/packaging (~15%). The donation details align with standard food donation practices, and no red flags or inconsistencies were detected that would suggest fraud.', 'breakdown': {'ingredients': 1822.5, 'labour': 1012.5, 'service': 607.5, 'misc': 607.5}}}
+
+[ERROR] Title: pizza | Exception: Unterminated string starting at: line 5 column 22 (char 102)
+Raw result_str: {
+    "is_fraudulent": false,
+    "suggested_value_inr": 4500.0,
+    "report": {
+        "reasoning": "The fair market value is calculated based on standard Indian retail pricing for a standard chicken pizza, which typically ranges between ₹350 and ₹550 per portion across major chains and local pizzerias. An average retail price of ₹450 per portion is applied. For 10 portions, the total fair market value is ₹4,500. The breakdown reflects a typical restaurant cost structure: ingredients (45%), labour (20%), service and operational overhead (20%), and miscellaneous costs including packaging, taxes, and prep fees (15%). This valuation aligns with standard
+
+[ERROR] Title: pizza | Exception: Unterminated string starting at: line 5 column 22 (char 102)
+Raw result_str: {
+    "is_fraudulent": false,
+    "suggested_value_inr": 4500.0,
+    "report": {
+        "reasoning": "The fair market value is calculated based on standard Indian retail pricing for a standard chicken pizza, which typically ranges between ₹350 and ₹550 per portion across major chains and local pizzerias. An average retail price of ₹450 per portion is applied. For 10 portions, the total fair market value is ₹4,500. The breakdown reflects a typical restaurant cost structure: ingredients (45%), labour (20%), service and operational overhead (20%), and miscellaneous costs including packaging, taxes, and prep fees (15%). This valuation aligns with standard
+
+[ERROR] Title: Milkshake | Exception: Unterminated string starting at: line 2 column 5 (char 6)
+Raw result_str: {
+    "is
+
+[SUCCESS] Title: Milkshake | Qty: 40 portions
+Result: {'is_fraudulent': False, 'suggested_value_inr': 7200.0, 'report': {'reasoning': "The fair market value is determined based on standard Indian commercial retail pricing for milkshakes, which typically ranges between ₹150 and ₹250 per portion in mid-to-premium food service establishments. Given the donor type (KITCHEN) and the subjective 'best in the world' descriptor, a conservative and defensible valuation of ₹180 per portion is applied to comply with Section 80G guidelines, which require reasonable market value without premium markup for marketing claims. Total valuation = 40 portions × ₹180 = ₹7,200. The cost breakdown follows standard Indian F&B industry allocation: ingredients (65%), labour (18%), service/overhead (12%), and miscellaneous costs (5%).", 'breakdown': {'ingredients': 4680.0, 'labour': 1296.0, 'service': 864.0, 'misc': 360.0}}}

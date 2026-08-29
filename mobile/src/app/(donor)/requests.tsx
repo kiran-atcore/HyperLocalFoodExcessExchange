@@ -46,15 +46,10 @@ export default function DonorRequestsScreen() {
         <View style={styles.headerRow}>
           <View style={styles.userCol}>
             <Text style={styles.name}>{item.requester_details?.name}</Text>
-            <View style={[styles.badge, { backgroundColor: isShelter ? '#eff6ff' : '#ecfdf5' }]}>
-              <Text style={[styles.badgeText, { color: isShelter ? '#2563eb' : '#059669' }]}>
-                {item.requester_details?.role?.toUpperCase()}
-              </Text>
-            </View>
           </View>
           <Ionicons name="time-outline" size={20} color="#f59e0b" />
         </View>
-        <Text style={styles.itemText}>{item.listing_details?.title}</Text>
+        <Text style={styles.itemText}>{item.quantity || 1} {item.listing_details?.quantity_unit || 'portions'} claimed • {item.listing_details?.title}</Text>
         <View style={styles.footerRow}>
           <Text style={styles.timeText}>{item.eta ? `ETA: ${new Date(item.eta).toLocaleTimeString()}` : 'No ETA Provided'}</Text>
           {item.listing_details?.pickup_end && (

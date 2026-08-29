@@ -8,14 +8,14 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason']
+        fields = ['id', 'email', 'username', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason', 'first_name', 'last_name']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     
     class Meta:
         model = User
-        fields = ['email', 'username', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude']
+        fields = ['email', 'username', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'first_name', 'last_name']
         
     def create(self, validated_data):
         role = validated_data.get('role', 'consumer')
@@ -31,6 +31,8 @@ class RegisterSerializer(serializers.ModelSerializer):
             address=validated_data.get('address', ''),
             latitude=validated_data.get('latitude', None),
             longitude=validated_data.get('longitude', None),
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
             is_approved=is_approved,
             approval_status=approval_status
         )

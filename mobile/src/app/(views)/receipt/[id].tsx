@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../../utils/api';
+import CountdownTimer from '../../../components/CountdownTimer';
 
 export default function ReceiptViewScreen() {
   const { id } = useLocalSearchParams();
@@ -25,6 +26,29 @@ export default function ReceiptViewScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelOrder = () => {
+    Alert.alert(
+      "Cancel Order",
+      "Are you sure you want to cancel this order?",
+      [
+        { text: "Keep Order", style: "cancel" },
+        { 
+          text: "Cancel", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await api.patch(`/orders/${id}/cancel/`);
+              Alert.alert("Cancelled", "The order was cancelled.");
+              fetchOrder();
+            } catch (error) {
+              Alert.alert("Error", "Failed to cancel order.");
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
@@ -57,7 +81,7 @@ export default function ReceiptViewScreen() {
           <QRCode value={order.qr_code_id || order.id.toString()} size={150} color={isRedeemed ? '#cbd5e1' : '#0f172a'} />
         </View>
         <Text style={styles.scanText}>
-          {isRedeemed ? `Order ${order.status}` : 'Show this QR code to the vendor at pickup'}
+          {isRedeemed ? `Order ${order.status.replace('_', ' ')}` : 'Show this QR code to the vendor at pickup'}
         </Text>
         
         <View style={styles.divider} />
@@ -72,13 +96,29 @@ export default function ReceiptViewScreen() {
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.label}>Status</Text>
-          <Text style={[styles.statusReady, isRedeemed && { color: '#94a3b8' }]}>{order.status}</Text>
+          <Text style={[styles.statusReady, isRedeemed && { color: '#94a3b8' }]}>{order.status.replace('_', ' ')}</Text>
         </View>
+        
+        {!isRedeemed && order.listing_details?.pickup_end && (
+          <View style={styles.detailRow}>
+            <Text style={styles.label}>Post Expires</Text>
+            <Text style={{ fontSize: 15, color: '#ef4444', fontWeight: 'bold' }}>
+              <CountdownTimer targetDate={order.listing_details.pickup_end} />
+            </Text>
+          </View>
+        )}
+
         <View style={styles.detailRow}>
           <Text style={styles.label}>Order ID</Text>
           <Text style={styles.value}>#ORD-{order.id}</Text>
         </View>
       </View>
+
+      {!isRedeemed && (
+        <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelOrder}>
+          <Text style={styles.cancelBtnText}>Cancel Order</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Text style={styles.backButtonText}>Go Back</Text>
@@ -98,6 +138,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, color: '#64748b', fontWeight: '500' },
   value: { fontSize: 15, color: '#0f172a', fontWeight: 'bold' },
   statusReady: { fontSize: 15, color: '#10b981', fontWeight: '900' },
-  backButton: { marginTop: 32, padding: 16, borderRadius: 12, backgroundColor: '#e2e8f0', width: '100%', alignItems: 'center' },
+  backButton: { marginTop: 16, padding: 16, borderRadius: 12, backgroundColor: '#e2e8f0', width: '100%', alignItems: 'center' },
   backButtonText: { color: '#475569', fontWeight: 'bold', fontSize: 16 },
+  cancelBtn: { marginTop: 32, padding: 16, borderRadius: 12, backgroundColor: '#fee2e2', width: '100%', alignItems: 'center' },
+  cancelBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 16 }
 });

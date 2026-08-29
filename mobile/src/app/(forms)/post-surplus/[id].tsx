@@ -167,10 +167,10 @@ export default function PostSurplusScreen() {
             
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Quantity</Text>
+                <Text style={styles.label}>Quantity (portions)</Text>
                 <TextInput style={styles.input} placeholder="e.g. 5" keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
               </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: isDonation ? 8 : 0 }]}>
                 <Text style={styles.label}>Pickup Deadline</Text>
                 <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={handleOpenPicker}>
                   <Text style={{ color: '#0f172a' }}>{pickupEnd.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</Text>
@@ -190,16 +190,18 @@ export default function PostSurplusScreen() {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Unit</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-                {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
-                  <TouchableOpacity key={u} style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} onPress={() => setQuantityUnit(u)}>
-                    <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+            {isDonation && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Unit</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
+                    <TouchableOpacity key={u} style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} onPress={() => setQuantityUnit(u)}>
+                      <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Dietary Info</Text>
@@ -224,12 +226,14 @@ export default function PostSurplusScreen() {
               <View style={[styles.inputGroup, { flex: 1, marginRight: isDonation ? 0 : 8 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={[styles.label, { marginBottom: 0 }]}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
-                  <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
-                    <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>
-                  </TouchableOpacity>
+                  {isDonation && (
+                    <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
+                      <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <TextInput style={styles.input} placeholder="0.00" keyboardType="decimal-pad" value={originalPrice} onChangeText={setOriginalPrice} />
-                {aiEstimate && <Text style={{ color: '#10b981', fontSize: 12, marginTop: 4 }}>AI Suggested Max: ₹{aiEstimate}</Text>}
+                {isDonation && aiEstimate && <Text style={{ color: '#10b981', fontSize: 12, marginTop: 4 }}>AI Suggested Max: ₹{aiEstimate}</Text>}
                 {isDonation && <Text style={{ color: '#f59e0b', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>Note: Exaggerated values will be automatically flagged for admin review.</Text>}
               </View>
               {!isDonation && (

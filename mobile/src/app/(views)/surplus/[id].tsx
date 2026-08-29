@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,10 +49,13 @@ export default function SurplusDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
+              setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'CANCELLED' } : o));
+              DeviceEventEmitter.emit('claim_cancelled', { listingId: id });
               await api.patch(`/orders/${orderId}/cancel/`);
               Alert.alert("Claim Cancelled", "The listing is now active again.");
               fetchListing();
             } catch (error) {
+              fetchListing();
               Alert.alert("Error", "Failed to cancel claim.");
             }
           }
@@ -133,8 +136,8 @@ export default function SurplusDetailScreen() {
         <Text style={styles.sectionTitle}>Status</Text>
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Quantity Available:</Text>
-            <Text style={styles.infoValue}>{listing.quantity_available} {listing.quantity_unit || 'portions'}</Text>
+            <Text style={styles.infoLabel}>Quantity:</Text>
+            <Text style={styles.infoValue}>{listing.listing_type === 'DONATION' ? listing.quantity_available : (listing.quantity_remaining !== undefined ? listing.quantity_remaining : listing.quantity_available)} {listing.quantity_unit || 'portions'} {listing.listing_type !== 'DONATION' ? 'available' : ''}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Dietary Info:</Text>
@@ -229,10 +232,12 @@ export default function SurplusDetailScreen() {
             <Text style={styles.editBtnText}>{isExpired ? 'Reactivate' : 'Edit Listing'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
-            <Text style={styles.deleteBtnText}>Delete</Text>
-          </TouchableOpacity>
+          {(isExpired || !orders.some(o => o.status !== 'PICKED_UP' && o.status !== 'CANCELLED' && o.status !== 'EXPIRED') || (listing.quantity_remaining !== undefined ? listing.quantity_remaining > 0 : listing.quantity_available > 0)) && (
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color="#ef4444" style={{ marginRight: 8 }} />
+              <Text style={styles.deleteBtnText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
       </ScrollView>

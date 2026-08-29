@@ -13,6 +13,8 @@ export default function EditSurplusScreen() {
   const [originalPrice, setOriginalPrice] = useState('');
   const [discountPrice, setDiscountPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
+  const [originalQuantity, setOriginalQuantity] = useState(1);
+  const [remainingQuantity, setRemainingQuantity] = useState(1);
   const [quantityUnit, setQuantityUnit] = useState('portions');
   const [dietaryInfo, setDietaryInfo] = useState('None');
   const [additionalDetails, setAdditionalDetails] = useState('');
@@ -63,6 +65,8 @@ export default function EditSurplusScreen() {
       setOriginalPrice(data.original_price);
       setDiscountPrice(data.discounted_price);
       setQuantity(data.quantity_available.toString());
+      setOriginalQuantity(data.quantity_available);
+      setRemainingQuantity(data.quantity_remaining !== undefined ? data.quantity_remaining : data.quantity_available);
       setQuantityUnit(data.quantity_unit || 'portions');
       setDietaryInfo(data.dietary_info || 'None');
       setAdditionalDetails(data.additional_details || '');
@@ -113,6 +117,16 @@ export default function EditSurplusScreen() {
 
   const handleUpdate = async () => {
     setIsSubmitting(true);
+    
+    const parsedQuantity = parseInt(quantity) || 1;
+    const minQuantity = Math.max(1, originalQuantity - remainingQuantity);
+    
+    if (!isDonation && parsedQuantity < minQuantity) {
+      Alert.alert("Invalid Quantity", `You cannot decrease the total quantity below ${minQuantity} because those portions have already been claimed.`);
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const payload = {
         title,
@@ -121,7 +135,7 @@ export default function EditSurplusScreen() {
         original_price: originalPrice || '0.00',
         discounted_price: isDonation ? '0.00' : (discountPrice || '0.00'),
         estimated_fmv: originalPrice || '0.00',
-        quantity_available: parseInt(quantity) || 1,
+        quantity_available: parsedQuantity,
         quantity_unit: quantityUnit,
         dietary_info: dietaryInfo,
         additional_details: additionalDetails,
@@ -165,10 +179,21 @@ export default function EditSurplusScreen() {
             
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Quantity</Text>
-                <TextInput style={styles.input} placeholder="e.g. 5" keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
+                <Text style={styles.label}>Quantity (portions)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="e.g. 5" 
+                  keyboardType="numeric" 
+                  value={quantity} 
+                  onChangeText={setQuantity} 
+                />
+                {!isDonation && (
+                  <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                    Min: {Math.max(1, originalQuantity - remainingQuantity)} (due to active claims)
+                  </Text>
+                )}
               </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+              <View style={[styles.inputGroup, { flex: 1, marginLeft: isDonation ? 8 : 0 }]}>
                 <Text style={styles.label}>Pickup Deadline</Text>
                 <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={handleOpenPicker}>
                   <Text style={{ color: '#0f172a' }}>{pickupEnd.toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</Text>
@@ -188,16 +213,18 @@ export default function EditSurplusScreen() {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Unit</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-                {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
-                  <TouchableOpacity key={u} style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} onPress={() => setQuantityUnit(u)}>
-                    <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+            {isDonation && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Unit</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
+                    <TouchableOpacity key={u} style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} onPress={() => setQuantityUnit(u)}>
+                      <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Dietary Info</Text>
@@ -222,12 +249,14 @@ export default function EditSurplusScreen() {
               <View style={[styles.inputGroup, { flex: 1, marginRight: isDonation ? 0 : 8 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Text style={[styles.label, { marginBottom: 0 }]}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
-                  <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
-                    <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>
-                  </TouchableOpacity>
+                  {isDonation && (
+                    <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
+                      <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <TextInput style={styles.input} placeholder="0.00" keyboardType="decimal-pad" value={originalPrice} onChangeText={setOriginalPrice} />
-                {aiEstimate && <Text style={{ color: '#10b981', fontSize: 12, marginTop: 4 }}>AI Suggested Max: ₹{aiEstimate}</Text>}
+                {isDonation && aiEstimate && <Text style={{ color: '#10b981', fontSize: 12, marginTop: 4 }}>AI Suggested Max: ₹{aiEstimate}</Text>}
                 {isDonation && <Text style={{ color: '#f59e0b', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>Note: Exaggerated values will be automatically flagged for admin review.</Text>}
               </View>
               {!isDonation && (

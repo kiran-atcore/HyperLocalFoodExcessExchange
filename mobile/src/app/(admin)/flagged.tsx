@@ -7,6 +7,7 @@ import api from '../../utils/api';
 import { AuthContext } from '../../context/AuthContext';
 
 export default function AdminFlaggedScreen() {
+  const { logout } = React.useContext(AuthContext);
   const [receipts, setReceipts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +38,6 @@ export default function AdminFlaggedScreen() {
     );
   }
 
-  const { logout } = React.useContext(AuthContext);
 
   return (
     <SafeAreaView style={styles.container}>

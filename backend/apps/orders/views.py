@@ -44,13 +44,31 @@ class OrderViewSet(viewsets.ModelViewSet):
             except FoodListing.DoesNotExist:
                 return Response({'error': 'Listing not found.'}, status=status.HTTP_404_NOT_FOUND)
                 
-            if listing.orders.exclude(status__in=['CANCELLED', 'EXPIRED']).exists():
-                return Response({'error': 'This donation has already been claimed by another shelter.'}, status=status.HTTP_400_BAD_REQUEST)
-                
-            return super().create(request, *args, **kwargs)
+            requested_quantity = int(request.data.get('quantity', 1))
 
-    def perform_create(self, serializer):
-        serializer.save(requester=self.request.user)
+            if listing.listing_type == 'DONATION':
+                if listing.orders.exclude(status__in=['CANCELLED', 'EXPIRED']).exists():
+                    return Response({'error': 'This donation has already been claimed by another shelter.'}, status=status.HTTP_400_BAD_REQUEST)
+                requested_quantity = listing.quantity_available
+            else:
+                from django.db.models import Sum
+                total_ordered = listing.orders.exclude(status__in=['CANCELLED', 'EXPIRED']).aggregate(Sum('quantity'))['quantity__sum'] or 0
+                remaining = listing.quantity_available - total_ordered
+                if remaining <= 0:
+                     return Response({'error': 'This deal is fully claimed.'}, status=status.HTTP_400_BAD_REQUEST)
+                if requested_quantity > remaining:
+                    return Response({'error': f'Not enough quantity available. Only {remaining} left.'}, status=status.HTTP_400_BAD_REQUEST)
+                if requested_quantity < 1:
+                     return Response({'error': 'Quantity must be at least 1.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer, requested_quantity)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer, quantity=1):
+        serializer.save(requester=self.request.user, quantity=quantity)
 
     @action(detail=True, methods=['patch'])
     def complete(self, request, pk=None):
@@ -100,8 +118,18 @@ class OrderViewSet(viewsets.ModelViewSet):
         if not qr_code_id:
             return Response({'error': 'qr_code_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
             
+        from django.core.exceptions import ValidationError
+        import uuid
         try:
-            order = Order.objects.get(qr_code_id=qr_code_id)
+            # Check if it's a valid UUID
+            uuid_obj = uuid.UUID(str(qr_code_id))
+            order = Order.objects.get(qr_code_id=uuid_obj)
+        except (ValueError, ValidationError):
+            # Fallback for old orders where QR code might be the ID
+            try:
+                order = Order.objects.get(id=int(qr_code_id))
+            except (ValueError, Order.DoesNotExist):
+                return Response({'error': 'Invalid QR code.'}, status=status.HTTP_404_NOT_FOUND)
         except Order.DoesNotExist:
             return Response({'error': 'Invalid QR code.'}, status=status.HTTP_404_NOT_FOUND)
             

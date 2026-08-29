@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
+import QRCode from 'react-native-qrcode-svg';
 import api from '../../utils/api';
 import CountdownTimer from '../../components/CountdownTimer';
 
@@ -64,6 +65,34 @@ export default function ShelterClaimsScreen() {
     const isApproved = item.status === 'APPROVED';
     const isExpired = item.status === 'EXPIRED';
     const isCancelled = item.status === 'CANCELLED';
+
+    if (activeTab === 'DISCOUNT') {
+      const isRedeemed = isCompleted || isCancelled || isExpired;
+      return (
+        <TouchableOpacity 
+          style={[styles.receiptCard, isRedeemed && styles.receiptCardFaded]} 
+          activeOpacity={0.8} 
+          onPress={() => router.push(`/(views)/receipt/${item.id}` as any)}
+        >
+          <View style={styles.qrContainer}>
+            <QRCode value={item.qr_code_id || item.id.toString()} size={80} color={isRedeemed ? '#cbd5e1' : '#0f172a'} />
+          </View>
+          <View style={styles.details}>
+            <Text style={styles.receiptTitle}>{item.listing_details?.title || 'Unknown Item'}</Text>
+            <Text style={styles.vendor}>{item.listing_details?.donor_name || 'Vendor'}</Text>
+            <Text style={[styles.receiptStatus, !isRedeemed ? styles.statusReady : styles.statusRedeemed]}>
+              {item.status.replace('_', ' ')}
+            </Text>
+          </View>
+          {!isRedeemed && (
+            <TouchableOpacity style={{ padding: 8, marginLeft: 8 }} onPress={() => handleCancelClaim(item.id)}>
+              <Ionicons name="trash-outline" size={22} color="#ef4444" />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
     return (
       <TouchableOpacity style={[styles.card, isCompleted && styles.cardCompleted]} onPress={() => router.push(`/(views)/claim/${item.id}` as any)}>
         <View style={styles.headerRow}>
@@ -90,7 +119,7 @@ export default function ShelterClaimsScreen() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
             )}
-            <Text style={[styles.status, { color: isCompleted ? "#10b981" : ((isCancelled || isExpired) ? "#ef4444" : (isApproved ? "#3b82f6" : "#f59e0b")) }]}>{item.status}</Text>
+            <Text style={[styles.status, { color: isCompleted ? "#10b981" : ((isCancelled || isExpired) ? "#ef4444" : (isApproved ? "#3b82f6" : "#f59e0b")) }]}>{item.status.replace('_', ' ')}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -168,5 +197,14 @@ const styles = StyleSheet.create({
   time: { fontSize: 13, color: '#94a3b8' },
   status: { fontSize: 14, fontWeight: 'bold' },
   cancelBtn: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  cancelBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 12 }
+  cancelBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 12 },
+  receiptCard: { backgroundColor: '#ffffff', borderRadius: 16, marginBottom: 16, padding: 16, flexDirection: 'row', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  receiptCardFaded: { opacity: 0.6 },
+  qrContainer: { marginRight: 16, backgroundColor: '#f1f5f9', padding: 8, borderRadius: 8 },
+  details: { flex: 1 },
+  receiptTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
+  vendor: { fontSize: 14, color: '#64748b', marginTop: 4 },
+  receiptStatus: { marginTop: 8, fontSize: 12, fontWeight: 'bold' },
+  statusReady: { color: '#10b981' },
+  statusRedeemed: { color: '#94a3b8' }
 });

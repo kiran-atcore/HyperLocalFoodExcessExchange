@@ -137,9 +137,8 @@ class AdminDashboardStatsView(APIView):
         active_kitchens = User.objects.filter(role='donor', is_approved=True).count()
         active_shelters = User.objects.filter(role='shelter', is_approved=True).count()
         
-        # 3. Portions Saved (Sum of listing quantity for PICKED_UP orders)
-        portions_saved_agg = Order.objects.filter(status='PICKED_UP').aggregate(total=Sum('listing__quantity_available'))
-        portions_saved = portions_saved_agg['total'] or 0
+        # 3. Successful Pickups (Count of PICKED_UP orders)
+        successful_pickups = Order.objects.filter(status='PICKED_UP').count()
         
         # 4. Weekly Donations (Mon-Sun for current week)
         today = timezone.now().date()
@@ -190,7 +189,7 @@ class AdminDashboardStatsView(APIView):
             "total_users": total_users,
             "active_kitchens": active_kitchens,
             "active_shelters": active_shelters,
-            "portions_saved": portions_saved,
+            "successful_pickups": successful_pickups,
             "weekly_donations": weekly_donations,
             "recent_activity": activities
         })

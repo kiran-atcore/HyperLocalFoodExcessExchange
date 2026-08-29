@@ -60,10 +60,10 @@ export default function AdminDashboardScreen() {
     { id: 1, title: 'Total Users', value: data.total_users.toString(), icon: 'people', color: '#3b82f6', bg: '#eff6ff' },
     { id: 2, title: 'Active Kitchens', value: data.active_kitchens.toString(), icon: 'restaurant', color: '#f59e0b', bg: '#fffbeb' },
     { id: 3, title: 'Active Shelters', value: data.active_shelters.toString(), icon: 'home', color: '#8b5cf6', bg: '#f5f3ff' },
-    { id: 4, title: 'Portions Saved', value: data.portions_saved.toString(), icon: 'leaf', color: '#10b981', bg: '#ecfdf5' },
+    { id: 4, title: 'Successful Pickups', value: data.successful_pickups.toString(), icon: 'leaf', color: '#10b981', bg: '#ecfdf5' },
   ];
 
-  const maxWeekly = Math.max(...data.weekly_donations, 1);
+  const maxWeekly = Math.max(...data.weekly_donations, 10); // Minimum scale of 10 to avoid exaggerated bars
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   return (

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, DeviceEventEmitter, Alert } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
 import LocationBanner from '../../components/LocationBanner';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
@@ -95,7 +96,11 @@ export default function ConsumerFeedScreen() {
         api.get('/users/me/').catch(() => null)
       ]);
       const now = new Date().getTime();
-      const activeDeals = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      const activeDeals = listingsRes.data.filter((item: any) => 
+        new Date(item.pickup_end).getTime() > now && 
+        !item.is_claimed && 
+        (item.quantity_remaining === undefined || item.quantity_remaining > 0)
+      );
       setFeed(activeDeals);
     } catch (e) {
       console.error(e);
@@ -118,17 +123,17 @@ export default function ConsumerFeedScreen() {
     return d < 1 ? '< 1 km' : `${d.toFixed(1)} km`;
   };
 
-  const submitBuyNow = async (etaMins: number) => {
+  const submitBuyNow = async (etaMins: number, quantity: number) => {
     if (!etaModalListing) return;
     const id = etaModalListing.id;
     setEtaModalListing(null);
 
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
-      const response = await api.post('/orders/', { listing: id, eta });
+      const response = await api.post('/orders/', { listing: id, eta, quantity });
       Alert.alert("Success", "Deal successfully claimed!");
       fetchFeed();
-      router.push('/(consumer)/receipts');
+      router.push(`/(views)/receipt/${response.data.id}` as any);
     } catch (e: any) {
       Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim deal.");
     }
@@ -141,13 +146,33 @@ export default function ConsumerFeedScreen() {
       ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
       : 'Distance unknown';
 
+    const origPrice = Number(item.original_price) || 0;
+    const discPrice = Number(item.discounted_price) || 0;
+    let discountPercent = 0;
+    if (origPrice > 0 && discPrice < origPrice) {
+      discountPercent = Math.round(((origPrice - discPrice) / origPrice) * 100);
+    }
+
+    const isClaimed = item.is_claimed || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
+    const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
+
     return (
-      <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => router.push(`/(views)/deal/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+      <TouchableOpacity 
+        style={[styles.card, isClaimed && { opacity: 0.6 }]} 
+        activeOpacity={0.9} 
+        onPress={() => router.push(`/(views)/deal/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}
+      >
         {item.image_url ? (
            <Image source={{ uri: item.image_url }} style={styles.image} />
         ) : (
            <View style={[styles.image, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
              <Text style={{color: '#94a3b8'}}>No Image</Text>
+           </View>
+        )}
+        
+        {discountPercent > 0 && (
+           <View style={styles.discountBanner}>
+             <Text style={styles.discountBannerText}>{discountPercent}% OFF</Text>
            </View>
         )}
         
@@ -159,14 +184,21 @@ export default function ConsumerFeedScreen() {
             </Text>
           </View>
           <Text style={styles.vendor}>{item.donor_name || 'Vendor'} • {distanceStr}</Text>
-          <Text style={styles.originalPrice}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+            <Text style={[styles.originalPrice, { marginBottom: 0 }]}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+            <Text style={{fontSize: 12, color: '#64748b', marginLeft: 6}}>• {remainingCount} left</Text>
+          </View>
           
           <View style={styles.footerRow}>
             <Text style={styles.time}>
               Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => fetchFeed()} />
             </Text>
-            <TouchableOpacity style={styles.button} onPress={() => setEtaModalListing(item)}>
-              <Text style={styles.buttonText}>Buy Now</Text>
+            <TouchableOpacity 
+              style={[styles.button, isClaimed && { backgroundColor: '#94a3b8' }]} 
+              onPress={() => !isClaimed && setEtaModalListing(item)}
+              disabled={isClaimed}
+            >
+              <Text style={styles.buttonText}>{isClaimed ? 'Sold Out' : 'Buy Now'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -190,7 +222,7 @@ export default function ConsumerFeedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LocationBanner 
-        address={displayAddress} 
+        address={!isLocationReady ? 'Fetching location...' : displayAddress} 
         autoFetch={false} 
         onLocationChange={handleLocationChange} 
         onMapPress={() => {
@@ -225,6 +257,8 @@ export default function ConsumerFeedScreen() {
           onClose={() => setEtaModalListing(null)} 
           onConfirm={submitBuyNow} 
           pickupEnd={etaModalListing.pickup_end}
+          showQuantity={true}
+          maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
         />
       )}
     </SafeAreaView>
@@ -246,5 +280,7 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   time: { fontSize: 13, color: '#ef4444', fontWeight: '500' },
   button: { backgroundColor: '#0f172a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' }
+  buttonText: { color: '#fff', fontWeight: '600' },
+  discountBanner: { position: 'absolute', top: 12, left: 12, backgroundColor: '#ef4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 4 },
+  discountBannerText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 }
 });

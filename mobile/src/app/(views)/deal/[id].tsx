@@ -37,12 +37,12 @@ export default function DealsViewScreen() {
     setIsEtaModalVisible(true);
   };
 
-  const submitBuyNow = async (etaMins: number) => {
+  const submitBuyNow = async (etaMins: number, quantity: number) => {
     setIsEtaModalVisible(false);
     setIsClaiming(true);
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
-      const response = await api.post('/orders/', { listing: id, eta });
+      const response = await api.post('/orders/', { listing: id, eta, quantity });
       Alert.alert("Success", "Deal successfully claimed!");
       router.replace(`/(views)/receipt/${response.data.id}` as any);
     } catch (e: any) {
@@ -94,10 +94,26 @@ export default function DealsViewScreen() {
 
   if (!listing) return null;
 
+  let discountPercent = 0;
+  if (listing) {
+    const origPrice = Number(listing.original_price) || 0;
+    const discPrice = Number(listing.discounted_price) || 0;
+    if (origPrice > 0) {
+      discountPercent = Math.round(((origPrice - discPrice) / origPrice) * 100);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={{ flex: 1 }}>
-        <Image source={{ uri: listing.image_url || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800' }} style={styles.image} />
+        <View style={{ position: 'relative' }}>
+          <Image source={{ uri: listing.image_url || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800' }} style={styles.image} />
+          {discountPercent > 0 && (
+            <View style={styles.discountBannerOverlay}>
+              <Text style={styles.discountBannerText}>{discountPercent}% OFF</Text>
+            </View>
+          )}
+        </View>
       
       <View style={styles.content}>
         <View style={styles.headerRow}>
@@ -128,7 +144,9 @@ export default function DealsViewScreen() {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Quantity Available:</Text>
-          <Text style={styles.infoValue}>{listing.quantity_available} {listing.quantity_unit}</Text>
+          <Text style={styles.infoValue}>
+            {listing.quantity_remaining !== undefined ? listing.quantity_remaining : listing.quantity_available} {listing.quantity_unit}
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Pickup Location</Text>
@@ -165,6 +183,8 @@ export default function DealsViewScreen() {
           onClose={() => setIsEtaModalVisible(false)} 
           onConfirm={submitBuyNow} 
           pickupEnd={listing.pickup_end}
+          showQuantity={true}
+          maxQuantity={listing.quantity_remaining !== undefined ? listing.quantity_remaining : listing.quantity_available}
         />
       )}
     </SafeAreaView>
@@ -192,5 +212,24 @@ const styles = StyleSheet.create({
   reserveButton: { flex: 2, padding: 16, borderRadius: 12, backgroundColor: '#0f172a', alignItems: 'center' },
   reserveButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   mapContainer: { height: 180, borderRadius: 16, overflow: 'hidden', marginTop: 8, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#e2e8f0' },
-  map: { flex: 1 }
+  map: { flex: 1 },
+  discountBannerOverlay: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  discountBannerText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });

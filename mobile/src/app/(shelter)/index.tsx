@@ -45,7 +45,11 @@ export default function ShelterFeedScreen() {
         api.get('/users/me/')
       ]);
       const now = new Date().getTime();
-      const activeListings = listingsRes.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      const activeListings = listingsRes.data.filter((item: any) => 
+        new Date(item.pickup_end).getTime() > now && 
+        !item.is_claimed && 
+        (item.quantity_remaining === undefined || item.quantity_remaining > 0)
+      );
       setFeed(activeListings);
 
       const profile = profileRes.data;
@@ -85,7 +89,7 @@ export default function ShelterFeedScreen() {
     }
   };
 
-  const submitClaim = async (etaMins: number) => {
+  const submitClaim = async (etaMins: number, quantity: number) => {
     if (!etaModalListing) return;
     
     const id = etaModalListing.id;
@@ -94,9 +98,13 @@ export default function ShelterFeedScreen() {
     
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
-      const response = await api.post('/orders/', { listing: id, eta });
-      alert("Success! You have claimed this donation.");
-      router.push(`/(views)/claim/${response.data.id}` as any);
+      const response = await api.post('/orders/', { listing: id, eta, quantity });
+      alert("Success! You have claimed this item.");
+      if (activeTab === 'DISCOUNT') {
+        router.push(`/(views)/receipt/${response.data.id}` as any);
+      } else {
+        router.push(`/(views)/claim/${response.data.id}` as any);
+      }
     } catch (e: any) {
       console.error(e.response?.data || e.message);
       alert("Error: Could not claim this donation.");
@@ -116,15 +124,36 @@ export default function ShelterFeedScreen() {
       ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
       : 'Distance unknown';
       
+    const isClaimed = item.is_claimed || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
+    const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
+
     if (activeTab === 'DISCOUNT') {
+      const origPrice = Number(item.original_price) || 0;
+      const discPrice = Number(item.discounted_price) || 0;
+      let discountPercent = 0;
+      if (origPrice > 0 && discPrice < origPrice) {
+        discountPercent = Math.round(((origPrice - discPrice) / origPrice) * 100);
+      }
+
       return (
-        <TouchableOpacity style={styles.discountCard} activeOpacity={0.9} onPress={() => router.push(`/(views)/surplus/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+        <TouchableOpacity 
+          style={[styles.discountCard, isClaimed && { opacity: 0.6 }]} 
+          activeOpacity={0.9} 
+          onPress={() => router.push(`/(views)/deal/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}
+          disabled={isClaimed}
+        >
           {item.image_url ? (
             <Image source={{ uri: item.image_url }} style={styles.image} />
           ) : (
             <View style={[styles.image, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
               <Text style={{color: '#94a3b8'}}>No Image</Text>
             </View>
+          )}
+
+          {discountPercent > 0 && (
+             <View style={styles.discountBanner}>
+               <Text style={styles.discountBannerText}>{discountPercent}% OFF</Text>
+             </View>
           )}
           
           <View style={styles.cardContent}>
@@ -135,14 +164,21 @@ export default function ShelterFeedScreen() {
               </Text>
             </View>
             <Text style={styles.donor}>{item.donor_name || 'Vendor'} • {distanceStr}</Text>
-            <Text style={styles.originalPrice}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+              <Text style={[styles.originalPrice, { marginBottom: 0 }]}>Original: ${Number(item.original_price).toFixed(2)}</Text>
+              <Text style={{fontSize: 12, color: '#64748b', marginLeft: 6}}>• {remainingCount} left</Text>
+            </View>
             
             <View style={styles.footerRow}>
               <Text style={styles.time}>
                 Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => fetchFeed()} />
               </Text>
-              <TouchableOpacity style={[styles.button, {backgroundColor: '#0f172a'}]} onPress={() => router.push(`/(views)/surplus/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
-                <Text style={styles.buttonText}>Buy Now</Text>
+              <TouchableOpacity 
+                style={[styles.button, isClaimed ? { backgroundColor: '#94a3b8' } : {backgroundColor: '#0f172a'}]} 
+                onPress={() => !isClaimed && setEtaModalListing(item)}
+                disabled={isClaimed}
+              >
+                <Text style={styles.buttonText}>{isClaimed ? 'Sold Out' : 'Buy Now'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -152,23 +188,27 @@ export default function ShelterFeedScreen() {
 
     // DONATION card
     return (
-      <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/donation/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}>
+      <TouchableOpacity 
+        style={[styles.card, isClaimed && { opacity: 0.6 }]} 
+        onPress={() => router.push(`/(views)/donation/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}
+        disabled={isClaimed}
+      >
         <Text style={styles.title}>{item.title}</Text>
         <Text style={styles.donor}>{item.donor_name || 'Donor'} • {distanceStr}</Text>
         <Text style={[styles.time, { color: '#64748b', marginBottom: 12, fontSize: 13 }]}>
           Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => removeListing(item.id)} />
         </Text>
         <View style={styles.footerRow}>
-          <Text style={styles.time}>{item.quantity_available} {item.quantity_unit || 'portions'}</Text>
+          <Text style={styles.time}>{remainingCount} {item.quantity_unit || 'portions'}</Text>
           <TouchableOpacity 
-            style={[styles.button, (claimingId === item.id || item.is_claimed) && { opacity: 0.7, backgroundColor: item.is_claimed ? '#94a3b8' : '#3b82f6' }]} 
+            style={[styles.button, (claimingId === item.id || isClaimed) && { opacity: 0.7, backgroundColor: isClaimed ? '#94a3b8' : '#3b82f6' }]} 
             onPress={() => handleClaimPress(item)} 
-            disabled={claimingId === item.id || item.is_claimed}
+            disabled={claimingId === item.id || isClaimed}
           >
             {claimingId === item.id ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={styles.buttonText}>{item.is_claimed ? 'Already Claimed' : 'Claim for NGO'}</Text>
+              <Text style={styles.buttonText}>{isClaimed ? 'Already Claimed' : 'Claim for NGO'}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -219,6 +259,8 @@ export default function ShelterFeedScreen() {
           onClose={() => setEtaModalListing(null)} 
           onConfirm={submitClaim} 
           pickupEnd={etaModalListing.pickup_end}
+          showQuantity={activeTab === 'DISCOUNT'}
+          maxQuantity={activeTab === 'DISCOUNT' ? (etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available) : undefined}
         />
       )}
     </SafeAreaView>
@@ -249,4 +291,6 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   badgeDiscount: { backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
   originalPrice: { fontSize: 12, color: '#94a3b8', textDecorationLine: 'line-through', marginBottom: 12 },
+  discountBanner: { position: 'absolute', top: 12, left: 12, backgroundColor: '#ef4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 4 },
+  discountBannerText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 }
 });

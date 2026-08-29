@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,11 +16,24 @@ export default function DonorDashboardScreen() {
     }, [])
   );
 
+  React.useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('claim_cancelled', (event) => {
+      setListings(prev => prev.map(l => {
+        if (l.id.toString() === event.listingId.toString()) {
+          // Optimistically reset to active so the delete button shows up instantly. 
+          // The background fetchListings will correct it if it's actually partially sold.
+          return { ...l, donor_status: 'Active', quantity_remaining: l.quantity_available };
+        }
+        return l;
+      }));
+    });
+    return () => sub.remove();
+  }, []);
+
   const fetchListings = async () => {
     try {
       const response = await api.get('/listings/?mine=true');
-      const activeOnly = response.data.filter((item: any) => item.donor_status !== 'Picked Up');
-      setListings(activeOnly);
+      setListings(response.data);
     } catch (error) {
       console.error("Failed to fetch listings", error);
     } finally {
@@ -51,9 +64,12 @@ export default function DonorDashboardScreen() {
   };
   const renderItem = ({ item }: any) => {
     const isExpired = item.forceExpired || (item.pickup_end && new Date(item.pickup_end).getTime() <= new Date().getTime());
+    const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
+    const displayCount = item.listing_type === 'DONATION' ? item.quantity_available : remainingCount;
+    const isSoldOut = item.donor_status === 'Claimed' || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
     
     return (
-      <TouchableOpacity style={styles.card} onPress={() => router.push(`/(views)/surplus/${item.id}` as any)}>
+      <TouchableOpacity style={[styles.card, isSoldOut && { opacity: 0.5 }]} onPress={() => router.push(`/(views)/surplus/${item.id}` as any)}>
         <View style={styles.headerRow}>
           <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{item.title}</Text>
           <Text style={styles.price}>{item.listing_type === 'DONATION' ? 'FREE' : `₹${item.discounted_price}`}</Text>
@@ -72,7 +88,7 @@ export default function DonorDashboardScreen() {
               isExpired && item.donor_status === 'Active' ? styles.textExpired : styles.textPickedUp
             ]}>{isExpired && item.donor_status === 'Active' ? 'Expired' : item.donor_status}</Text>
           </View>
-          <Text style={styles.details}>{item.quantity_available} {item.quantity_unit || 'portions'} available</Text>
+          <Text style={styles.details}>{displayCount} {item.quantity_unit || 'portions'} {item.listing_type === 'DONATION' ? '(Total)' : 'available'}</Text>
         </View>
         <Text style={[styles.time, { color: '#64748b', marginBottom: 12, fontSize: 13 }]}>
           Expires in: <CountdownTimer 
@@ -92,9 +108,11 @@ export default function DonorDashboardScreen() {
                 <Text style={styles.buttonText}>Edit</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item.id)}>
-              <Ionicons name="trash-outline" size={16} color="#ef4444" />
-            </TouchableOpacity>
+            {(isExpired || item.donor_status === 'Picked Up' || item.donor_status !== 'Claimed') && (
+              <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item.id)}>
+                <Ionicons name="trash-outline" size={16} color="#ef4444" />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -108,7 +126,7 @@ export default function DonorDashboardScreen() {
         <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
       ) : (
         <FlatList 
-          data={listings} 
+          data={listings.filter(item => item.donor_status !== 'Picked Up')} 
           renderItem={renderItem} 
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={{ paddingBottom: 100 }}

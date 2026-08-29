@@ -55,9 +55,12 @@ export default function SuccessScreen() {
                 </TouchableOpacity>
                 {itemExpanded && (
                   <View style={styles.dropdownContent}>
-                    <Text style={styles.detailText}><Text style={styles.bold}>Quantity:</Text> {order.listing_details?.quantity_available} {order.listing_details?.quantity_unit}</Text>
+                    <Text style={styles.detailText}><Text style={styles.bold}>Quantity:</Text> {order.quantity || 1} {order.listing_details?.quantity_unit || 'portions'}</Text>
                     <Text style={styles.detailText}><Text style={styles.bold}>Type:</Text> {order.listing_details?.listing_type}</Text>
-                    <Text style={styles.detailText}><Text style={styles.bold}>Est. Value:</Text> ₹{order.listing_details?.estimated_fmv || '0.00'}</Text>
+                    <Text style={styles.detailText}><Text style={styles.bold}>Est. Value:</Text> ₹{(parseFloat(order.listing_details?.estimated_fmv || '0') * (order.listing_details?.listing_type === 'DONATION' ? 1 : (order.quantity || 1))).toFixed(2)}</Text>
+                    {order.listing_details?.listing_type === 'DISCOUNT' && (
+                      <Text style={styles.detailText}><Text style={styles.bold}>Discounted Price:</Text> ₹{(parseFloat(order.listing_details?.discounted_price || '0') * (order.quantity || 1)).toFixed(2)}</Text>
+                    )}
                   </View>
                 )}
                 

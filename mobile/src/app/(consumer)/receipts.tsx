@@ -43,7 +43,7 @@ export default function WalletScreen() {
           <Text style={styles.title}>{item.listing_details?.title || 'Unknown Item'}</Text>
           <Text style={styles.vendor}>{item.listing_details?.donor_name || 'Vendor'}</Text>
           <Text style={[styles.status, !isRedeemed ? styles.statusReady : styles.statusRedeemed]}>
-            {item.status}
+            {item.status.replace('_', ' ')}
           </Text>
         </View>
       </TouchableOpacity>

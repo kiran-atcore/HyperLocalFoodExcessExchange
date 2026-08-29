@@ -33,11 +33,12 @@ export default function ConsumerProfileScreen() {
       let foodRescued = 0;
 
       orders.forEach((order: any) => {
-        if (order.status === 'PICKED_UP' && order.listing) {
-          foodRescued += parseFloat(order.listing.quantity_available || '1');
-          const original = parseFloat(order.listing.original_price || '0');
-          const discounted = parseFloat(order.listing.discounted_price || '0');
-          moneySaved += (original - discounted);
+        if (order.status === 'PICKED_UP' && order.listing_details) {
+          foodRescued += 1;
+          const qty = order.quantity || 1;
+          const original = parseFloat(order.listing_details.original_price || '0');
+          const discounted = parseFloat(order.listing_details.discounted_price || '0');
+          moneySaved += (original - discounted) * qty;
         }
       });
 
@@ -99,7 +100,11 @@ export default function ConsumerProfileScreen() {
             <Text style={styles.avatarInitial}>{profile?.username ? profile.username.charAt(0).toUpperCase() : 'C'}</Text>
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profile?.username || 'Consumer'}</Text>
+            <Text style={styles.name}>{
+              (profile?.first_name || profile?.last_name)
+                ? `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+                : (profile?.business_name || profile?.username || 'Consumer')
+            }</Text>
             <Text style={styles.email}>{profile?.email}</Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>Consumer</Text>
@@ -109,8 +114,8 @@ export default function ConsumerProfileScreen() {
 
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.foodRescued.toFixed(1)} kg</Text>
-            <Text style={styles.statLabel}>Food Rescued</Text>
+            <Text style={styles.statValue}>{stats.foodRescued}</Text>
+            <Text style={styles.statLabel}>Successful Pickups</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statBox}>
@@ -140,7 +145,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc' },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 40, flexGrow: 1 },
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginVertical: 16 },
-  
+
   profileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
   avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, marginRight: 16, backgroundColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
   avatarInitial: { fontSize: 36, fontWeight: 'bold', color: '#ffffff' },

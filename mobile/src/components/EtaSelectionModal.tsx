@@ -4,17 +4,20 @@ import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 interface EtaSelectionModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (etaMinutes: number) => void;
+  onConfirm: (etaMinutes: number, quantity: number) => void;
   pickupEnd: string; // ISO string representing the expiration time
+  showQuantity?: boolean;
+  maxQuantity?: number;
 }
 
-export default function EtaSelectionModal({ visible, onClose, onConfirm, pickupEnd }: EtaSelectionModalProps) {
+export default function EtaSelectionModal({ visible, onClose, onConfirm, pickupEnd, showQuantity, maxQuantity }: EtaSelectionModalProps) {
   const [etaMinutes, setEtaMinutes] = useState<number>(30);
+  const [quantity, setQuantity] = useState<number>(1);
   const expirationTime = new Date(pickupEnd).getTime();
   const options = [15, 30, 60, 120];
 
   const handleConfirm = () => {
-    onConfirm(etaMinutes);
+    onConfirm(etaMinutes, quantity);
   };
 
   return (
@@ -52,6 +55,29 @@ export default function EtaSelectionModal({ visible, onClose, onConfirm, pickupE
             })}
           </View>
           
+          {showQuantity && (
+            <View style={styles.quantityContainer}>
+              <Text style={styles.quantityLabel}>Quantity</Text>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity 
+                  style={[styles.stepperBtn, quantity <= 1 && styles.stepperBtnDisabled]} 
+                  onPress={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1}
+                >
+                  <Text style={styles.stepperBtnText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.quantityValue}>{quantity}</Text>
+                <TouchableOpacity 
+                  style={[styles.stepperBtn, (maxQuantity !== undefined && quantity >= maxQuantity) && styles.stepperBtnDisabled]} 
+                  onPress={() => setQuantity(maxQuantity !== undefined ? Math.min(maxQuantity, quantity + 1) : quantity + 1)}
+                  disabled={maxQuantity !== undefined && quantity >= maxQuantity}
+                >
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <View style={styles.actionsContainer}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -97,5 +123,12 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: '#f1f5f9', alignItems: 'center' },
   cancelBtnText: { color: '#475569', fontWeight: 'bold', fontSize: 16 },
   confirmBtn: { flex: 2, padding: 16, borderRadius: 12, backgroundColor: '#10b981', alignItems: 'center' },
-  confirmBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 }
+  confirmBtnText: { color: '#ffffff', fontWeight: 'bold', fontSize: 16 },
+  quantityContainer: { marginBottom: 24, alignItems: 'center' },
+  quantityLabel: { fontSize: 16, color: '#0f172a', fontWeight: 'bold', marginBottom: 12 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 16, padding: 4 },
+  stepperBtn: { backgroundColor: '#ffffff', width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1 },
+  stepperBtnDisabled: { opacity: 0.5 },
+  stepperBtnText: { fontSize: 24, color: '#0f172a', fontWeight: '500', marginTop: -2 },
+  quantityValue: { fontSize: 20, fontWeight: 'bold', color: '#0f172a', width: 48, textAlign: 'center' },
 });
