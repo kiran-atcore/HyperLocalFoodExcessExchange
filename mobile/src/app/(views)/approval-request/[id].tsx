@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Alert, Linking } from 'react-native';
+import MiniMap from '../../../components/MiniMap';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -116,7 +117,7 @@ export default function ApprovalRequestDetailScreen() {
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Internal Manager Name</Text>
-            <Text style={styles.detailValue}>{user.username || 'N/A'}</Text>
+            <Text style={styles.detailValue}>{user.first_name || 'N/A'}</Text>
           </View>
         </View>
 
@@ -152,6 +153,11 @@ export default function ApprovalRequestDetailScreen() {
           </View>
           
           <Text style={styles.addressText}>{user.address || 'No address provided'}</Text>
+          {(user?.latitude && user?.longitude) ? (
+            <View style={styles.mapContainer}>
+              <MiniMap latitude={user.latitude} longitude={user.longitude} />
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
@@ -214,5 +220,7 @@ const styles = StyleSheet.create({
   rejectBtn: { backgroundColor: '#fee2e2', marginRight: 8 },
   rejectBtnText: { color: '#dc2626', fontSize: 16, fontWeight: 'bold' },
   approveBtn: { backgroundColor: '#10b981', marginLeft: 8 },
-  approveBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
+  approveBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
+  mapContainer: { height: 180, borderRadius: 16, overflow: 'hidden', marginTop: 12, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#e2e8f0' },
+  map: { flex: 1 }
 });

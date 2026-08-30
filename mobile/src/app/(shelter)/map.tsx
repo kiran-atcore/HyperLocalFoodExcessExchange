@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
+import { generateMapPinCardHtml } from '../../components/MapPinCard';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
 
 export default function ShelterMapScreen() {
@@ -136,26 +137,35 @@ export default function ShelterMapScreen() {
     return d < 1 ? '< 1 km away' : `${d.toFixed(1)} km away`;
   };
 
-  const markersJs = filteredDonations.map(item => {
-    const color = item.listing_type === 'DONATION' ? '#3b82f6' : '#10b981';
-    const targetLat = item.donor_latitude || item.latitude;
-    const targetLng = item.donor_longitude || item.longitude;
+  // Group listings by latitude and longitude to handle multiple items from the same location
+  const groupedDonations = filteredDonations.reduce((acc, item) => {
+    const lat = item.donor_latitude || item.latitude || 8.5241;
+    const lng = item.donor_longitude || item.longitude || 76.9366;
+    const key = `${lat}_${lng}`.replace(/\./g, '_');
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const markersJs = Object.values(groupedDonations).map((group: any) => {
+    // Sort so latest is first
+    const sortedGroup = [...group].sort((a: any, b: any) => b.id - a.id);
+    const first = sortedGroup[0];
+    const targetLat = first.donor_latitude || first.latitude || 8.5241;
+    const targetLng = first.donor_longitude || first.longitude || 76.9366;
     const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
-    
-    const badgeHtml = item.listing_type === 'DONATION' 
-      ? '<span style="font-size: 10px; background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block;">NGO Donation</span>'
-      : '<span style="font-size: 10px; background: #dcfce7; color: #065f46; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block;">Discounted Surplus</span>';
-    
-    const buttonText = item.is_claimed ? 'Already Claimed' : (item.listing_type === 'DONATION' ? 'Claim for NGO' : 'Buy Now');
-    const displayPrice = item.listing_type === 'DONATION' ? 'FREE' : `₹${item.discounted_price}`;
-    
+    const safeDonor = (first.donor_name || 'Donor').replace(/'/g, "\\'").replace(/\n|\r/g, ' ');
+    const groupId = `${targetLat}_${targetLng}`.replace(/\./g, '_');
+
+    const popupHtml = generateMapPinCardHtml(sortedGroup, distStr, safeDonor, groupId);
+
     return `
-      var m_${item.id} = L.marker([${targetLat || 37.78825}, ${targetLng || -122.4324}]).addTo(map);
-      mapMarkers[${item.id}] = m_${item.id};
-      markerExpirations[${item.id}] = '${item.pickup_end || ''}';
-      m_${item.id}.bindPopup('<div onclick="handleCardClick(${item.id})" style="font-family: sans-serif; text-align: center; cursor: pointer;"><b>${item.title.replace(/'/g, "\\'")}</b><br/>${badgeHtml}<br/><span style="color: #64748b;">${(item.donor_name || 'Donor').replace(/'/g, "\\'")}</span><br/><span style="color: ${color}; font-weight: bold; font-size: 14px;">${displayPrice}</span><br/><small style="color: ${color}; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><small style="color: #64748b;">Qty: ${item.quantity_available} ${item.quantity_unit}</small><br/><button ${item.is_claimed ? 'disabled' : ''} onclick="event.stopPropagation(); handleClaimClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: ${item.is_claimed ? '#94a3b8' : color}; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">${buttonText}</button></div>');
+      var m_${first.id} = L.marker([${targetLat}, ${targetLng}]).addTo(map);
+      mapMarkers[${first.id}] = m_${first.id};
+      ${sortedGroup.map(item => `markerExpirations[${item.id}] = '${item.pickup_end || ''}';`).join(' ')}
+      m_${first.id}.bindPopup(\`${popupHtml.replace(/`/g, '\\`')}\`);
     `;
-  }).join('\\n');
+  }).join('\n');
 
   const leafletHtml = `
     <!DOCTYPE html>
@@ -183,10 +193,10 @@ export default function ShelterMapScreen() {
         });
         L.Marker.prototype.options.icon = DefaultIcon;
 
-        var initialLat = ${userLocation ? userLocation.lat : 37.78825};
-        var initialLng = ${userLocation ? userLocation.lng : -122.4324};
+        var initialLat = ${userLocation ? userLocation.lat : 8.5241};
+        var initialLng = ${userLocation ? userLocation.lng : 76.9366};
         var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLng], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap © CARTO'
         }).addTo(map);
@@ -219,6 +229,29 @@ export default function ShelterMapScreen() {
           window.ReactNativeWebView.postMessage(JSON.stringify({type: 'view', id: id}));
         }
 
+        function toggleAccordion(event, groupId, id) {
+           event.stopPropagation();
+           var allContents = document.querySelectorAll('.group_' + groupId);
+           var targetContent = document.getElementById('content_' + id);
+           var targetIcon = document.getElementById('icon_' + id);
+           
+           var isCurrentlyOpen = targetContent.style.display === 'block';
+           
+           // Close all
+           allContents.forEach(function(el) {
+              el.style.display = 'none';
+              var iconId = el.id.replace('content_', 'icon_');
+              var iconEl = document.getElementById(iconId);
+              if (iconEl) iconEl.innerText = '+';
+           });
+           
+           // Open the clicked one if it was closed
+           if (!isCurrentlyOpen) {
+              targetContent.style.display = 'block';
+              if (targetIcon) targetIcon.innerText = '−';
+           }
+        }
+
         // Live Countdown Timer Logic for Popups
         setInterval(function() {
           var now = new Date().getTime();
@@ -228,9 +261,9 @@ export default function ShelterMapScreen() {
              if (expires) {
                  var target = new Date(expires).getTime();
                  if (target - now <= 0) {
-                     if (mapMarkers[id]) {
-                         map.removeLayer(mapMarkers[id]);
-                         delete mapMarkers[id];
+                     var itemContainer = document.getElementById('item_container_' + id);
+                     if (itemContainer) {
+                         itemContainer.style.display = 'none';
                      }
                  }
              }
@@ -284,7 +317,6 @@ export default function ShelterMapScreen() {
         </View>
       ) : (
         <WebView
-          key={filteredDonations.length}
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: leafletHtml }}

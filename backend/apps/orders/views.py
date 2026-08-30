@@ -1,10 +1,26 @@
-from rest_framework import viewsets, permissions, status, filters
+from rest_framework import viewsets, permissions, status, filters, generics
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Order, OrderStatus
 from .serializers import OrderSerializer
 from apps.tax_receipts.models import TaxReceipt
+
+class AdminOrderListView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role != 'admin':
+            return Order.objects.none()
+            
+        queryset = Order.objects.all().order_by('-created_at')
+        
+        order_status = self.request.query_params.get('status')
+        if order_status:
+            queryset = queryset.filter(status=order_status)
+            
+        return queryset
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer

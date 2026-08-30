@@ -79,7 +79,8 @@ export default function PostSurplusScreen() {
         title,
         description,
         quantity_available: parseInt(quantity) || 1,
-        quantity_unit: quantityUnit
+        quantity_unit: quantityUnit,
+        listing_type: isDonation ? 'DONATION' : 'DISCOUNT'
       });
       const suggestedVal = response.data.suggested_value_inr;
       setAiEstimate(suggestedVal.toString());
@@ -108,8 +109,8 @@ export default function PostSurplusScreen() {
         quantity_unit: quantityUnit,
         dietary_info: dietaryInfo,
         additional_details: additionalDetails,
-        latitude: userLat || 37.78825, // Fallback if kitchen profile has no location
-        longitude: userLng || -122.4324,
+        latitude: userLat || 8.5241, // Fallback if kitchen profile has no location
+        longitude: userLng || 76.9366,
         pickup_address: userAddress || "Kitchen Location",
         pickup_start: new Date().toISOString(),
         pickup_end: pickupEnd.toISOString(),
@@ -225,7 +226,7 @@ export default function PostSurplusScreen() {
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 1, marginRight: isDonation ? 0 : 8 }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={[styles.label, { marginBottom: 0 }]}>Est. Value (₹) {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
+                  <Text style={[styles.label, { marginBottom: 0 }]}>{isDonation ? 'Est. Value (₹)' : 'Original Price (₹)'} {isDonation && <Text style={{ color: '#10b981', fontSize: 11 }}>(For Tax Receipt)</Text>}</Text>
                   {isDonation && (
                     <TouchableOpacity onPress={handleGetEstimate} disabled={isEstimating}>
                       <Text style={{ color: '#3b82f6', fontSize: 12, fontWeight: 'bold' }}>{isEstimating ? 'Estimating...' : 'Get AI Estimate'}</Text>

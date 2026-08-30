@@ -2,10 +2,11 @@ import React, { useCallback, useContext, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
+import MiniMap from '../../components/MiniMap';
 import { AuthContext } from '../../context/AuthContext';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
+import * as SecureStore from 'expo-secure-store';
 
 export default function DonorProfileScreen() {
   const { logout } = useContext(AuthContext);
@@ -20,6 +21,9 @@ export default function DonorProfileScreen() {
 
   const fetchProfile = async () => {
     try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) return;
+
       const response = await api.get('/users/me/');
       setProfile(response.data);
     } catch (e) {
@@ -69,7 +73,8 @@ export default function DonorProfileScreen() {
             <Ionicons name="storefront" size={40} color="#3b82f6" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profile?.business_name || profile?.username || 'Loading...'}</Text>
+            <Text style={styles.name}>{profile?.business_name || profile?.first_name || 'Loading...'}</Text>
+            {profile?.first_name && <Text style={styles.ownerName}>Manager: {profile.first_name}</Text>}
             <Text style={styles.email}>{profile?.email || 'Loading...'}</Text>
             <View style={styles.badge}>
               <Text style={styles.badgeText}>Verified Donor</Text>
@@ -89,35 +94,7 @@ export default function DonorProfileScreen() {
                 <Text style={styles.addressText}>{profile.address}</Text>
               </View>
               <View style={styles.miniMapContainer}>
-                <WebView
-                  originWhitelist={['*']}
-                  source={{ html: `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-                      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                      <style>
-                        body { padding: 0; margin: 0; }
-                        html, body, #map { height: 100%; width: 100vw; }
-                      </style>
-                    </head>
-                    <body>
-                      <div id="map"></div>
-                      <script>
-                        var map = L.map('map', { 
-                          zoomControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false 
-                        }).setView([${profile.latitude}, ${profile.longitude}], 14);
-                        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(map);
-                        L.marker([${profile.latitude}, ${profile.longitude}]).addTo(map);
-                      </script>
-                    </body>
-                    </html>
-                  ` }}
-                  style={{ flex: 1 }}
-                  scrollEnabled={false}
-                />
+                <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
               </View>
             </View>
           </View>
@@ -147,7 +124,8 @@ const styles = StyleSheet.create({
   editProfileBtn: { position: 'absolute', top: 12, right: 12, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 20, zIndex: 10, elevation: 3 },
   avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', marginRight: 16, alignItems: 'center', justifyContent: 'center' },
   profileInfo: { flex: 1 },
-  name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 },
+  name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
+  ownerName: { fontSize: 13, color: '#475569', fontWeight: '500', marginBottom: 4 },
   email: { fontSize: 14, color: '#64748b', marginBottom: 8 },
   badge: { backgroundColor: '#d1fae5', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { fontSize: 12, fontWeight: 'bold', color: '#065f46' },

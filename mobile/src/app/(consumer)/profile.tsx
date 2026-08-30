@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
+import * as SecureStore from 'expo-secure-store';
 
 export default function ConsumerProfileScreen() {
   const { logout } = useContext(AuthContext);
@@ -21,6 +22,9 @@ export default function ConsumerProfileScreen() {
 
   const fetchProfileData = async () => {
     try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) return;
+
       setLoading(true);
       const [profileRes, ordersRes] = await Promise.all([
         api.get('/users/me/'),
@@ -97,13 +101,13 @@ export default function ConsumerProfileScreen() {
 
         <View style={styles.profileHeader}>
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{profile?.username ? profile.username.charAt(0).toUpperCase() : 'C'}</Text>
+            <Text style={styles.avatarInitial}>{profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : 'C'}</Text>
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{
               (profile?.first_name || profile?.last_name)
                 ? `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
-                : (profile?.business_name || profile?.username || 'Consumer')
+                : (profile?.business_name || profile?.first_name || 'Consumer')
             }</Text>
             <Text style={styles.email}>{profile?.email}</Text>
             <View style={styles.badge}>

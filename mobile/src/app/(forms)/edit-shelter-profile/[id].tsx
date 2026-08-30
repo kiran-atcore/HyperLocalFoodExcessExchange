@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../../utils/api';
 import LocationBanner from '../../../components/LocationBanner';
+import * as Location from 'expo-location';
 
 import { AuthContext } from '../../../context/AuthContext';
 
@@ -13,24 +14,34 @@ export default function EditShelterProfileScreen() {
   const id = params.id;
   const { login } = React.useContext(AuthContext);
   const [businessName, setBusinessName] = useState('');
-  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regRole, setRegRole] = useState('');
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasManualLocation = useRef(false);
 
   useEffect(() => {
     if (id === 'new') {
       setBusinessName((params.business_name as string) || '');
+      setRegEmail((params.email as string) || '');
+      setRegPassword((params.password as string) || '');
+      setRegRole((params.role as string) || '');
+      setAddress('Fetching location...');
+      fetchCurrentLocation();
       setLoading(false);
     } else {
       fetchProfile();
     }
 
     const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
+      hasManualLocation.current = true;
       if (data.address) setAddress(data.address);
       if (data.lat && data.lng) {
         setLat(data.lat);
@@ -43,12 +54,53 @@ export default function EditShelterProfileScreen() {
     };
   }, []);
 
+  const fetchCurrentLocation = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setAddress(''); // reset if denied
+        return; 
+      }
+      let location;
+      try {
+        location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch (e) {
+        location = await Location.getLastKnownPositionAsync({});
+      }
+      
+      if (!location) {
+        setAddress('');
+        return;
+      }
+      
+      const { latitude, longitude } = location.coords;
+      
+      let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+      
+      if (hasManualLocation.current) return;
+
+      setLat(latitude);
+      setLng(longitude);
+      
+      if (geocode.length > 0) {
+        const addr = geocode[0];
+        const addressString = [addr.name, addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(', ');
+        setAddress(addressString);
+      } else {
+        setAddress('Current Location');
+      }
+    } catch (error) {
+      console.log('Error fetching location', error);
+      setAddress('');
+    }
+  };
+
   const fetchProfile = async () => {
     try {
       const response = await api.get('/users/me/');
       const data = response.data;
       setBusinessName(data.business_name || '');
-      setUsername(data.username || '');
+      setName(data.first_name || '');
       setPhoneNumber(data.phone_number || '');
       setAddress(data.address || '');
       setLat(data.latitude || null);
@@ -84,15 +136,13 @@ export default function EditShelterProfileScreen() {
 
     setIsSubmitting(true);
     try {
-      const sanitizedUsername = username.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9@.+-_]/g, '');
-      
       if (id === 'new') {
         await api.post('/users/register/', {
-          email: params.email,
-          password: params.password,
+          email: regEmail || (params.email as string),
+          password: regPassword || (params.password as string),
           business_name: businessName,
-          username: sanitizedUsername || (params.username as string),
-          role: params.role,
+          first_name: name,
+          role: regRole || (params.role as string),
           phone_number: phoneNumber,
           address: address,
           latitude: lat,
@@ -100,8 +150,8 @@ export default function EditShelterProfileScreen() {
         });
 
         const loginRes = await api.post('/users/login/', {
-          email: params.email,
-          password: params.password,
+          email: regEmail || (params.email as string),
+          password: regPassword || (params.password as string),
         });
         await login(loginRes.data.access, loginRes.data.refresh);
         Alert.alert("Request Sent", "Your organization is pending admin approval.");
@@ -109,7 +159,7 @@ export default function EditShelterProfileScreen() {
       } else {
         const payload = {
           business_name: businessName,
-          username: sanitizedUsername,
+          first_name: name,
           phone_number: phoneNumber,
           address: address,
           latitude: lat,
@@ -171,7 +221,7 @@ export default function EditShelterProfileScreen() {
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Manager Name (Internal)</Text>
-              <TextInput style={styles.input} placeholder="e.g. Jane Doe" value={username} onChangeText={setUsername} />
+              <TextInput style={styles.input} placeholder="e.g. Jane Doe" value={name} onChangeText={setName} />
             </View>
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
               <Text style={styles.label}>Phone Number</Text>

@@ -3,3 +3,9 @@ export const sharedLocation = {
   lng: null as number | null,
   address: ''
 };
+
+export const clearSharedLocation = () => {
+  sharedLocation.lat = null;
+  sharedLocation.lng = null;
+  sharedLocation.address = '';
+};

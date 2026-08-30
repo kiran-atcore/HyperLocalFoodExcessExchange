@@ -24,18 +24,18 @@ class TaxReceiptSerializer(serializers.ModelSerializer):
         ]
 
     def get_ngo_name(self, obj):
-        return obj.ngo.business_name if obj.ngo.business_name else obj.ngo.username
+        return obj.ngo.business_name if obj.ngo.business_name else obj.ngo.first_name
 
     def get_donor_details(self, obj):
         return {
-            'name': obj.donor.business_name or obj.donor.username,
+            'name': obj.donor.business_name or obj.donor.first_name,
             'email': obj.donor.email,
             'phone': obj.donor.phone_number or 'Not provided',
         }
 
     def get_ngo_details(self, obj):
         return {
-            'name': obj.ngo.business_name or obj.ngo.username,
+            'name': obj.ngo.business_name or obj.ngo.first_name,
             'email': obj.ngo.email,
             'phone': obj.ngo.phone_number or 'Not provided',
         }

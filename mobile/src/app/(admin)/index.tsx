@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import api from '../../utils/api';
 
 export default function AdminDashboardScreen() {
@@ -35,6 +35,7 @@ export default function AdminDashboardScreen() {
       case 'approval': return <Ionicons name="checkmark-circle" size={20} color="#10b981" />;
       case 'donation': return <Ionicons name="fast-food" size={20} color="#f59e0b" />;
       case 'rejection': return <Ionicons name="close-circle" size={20} color="#ef4444" />;
+      case 'ban': return <Ionicons name="warning" size={20} color="#dc2626" />;
       default: return <Ionicons name="person" size={20} color="#3b82f6" />;
     }
   };
@@ -57,10 +58,10 @@ export default function AdminDashboardScreen() {
   }
 
   const stats = [
-    { id: 1, title: 'Total Users', value: data.total_users.toString(), icon: 'people', color: '#3b82f6', bg: '#eff6ff' },
-    { id: 2, title: 'Active Kitchens', value: data.active_kitchens.toString(), icon: 'restaurant', color: '#f59e0b', bg: '#fffbeb' },
-    { id: 3, title: 'Active Shelters', value: data.active_shelters.toString(), icon: 'home', color: '#8b5cf6', bg: '#f5f3ff' },
-    { id: 4, title: 'Successful Pickups', value: data.successful_pickups.toString(), icon: 'leaf', color: '#10b981', bg: '#ecfdf5' },
+    { id: 1, title: 'Total Users', value: data.total_users.toString(), icon: 'people', color: '#3b82f6', bg: '#eff6ff', route: '/(adminViews)/TotalUsers' },
+    { id: 2, title: 'Active Kitchens', value: data.active_kitchens.toString(), icon: 'restaurant', color: '#f59e0b', bg: '#fffbeb', route: '/(adminViews)/ActiveKitchens' },
+    { id: 3, title: 'Active Shelters', value: data.active_shelters.toString(), icon: 'home', color: '#8b5cf6', bg: '#f5f3ff', route: '/(adminViews)/ActiveShelters' },
+    { id: 4, title: 'Successful Pickups', value: data.successful_pickups.toString(), icon: 'leaf', color: '#10b981', bg: '#ecfdf5', route: '/(adminViews)/SuccessfulPickups' },
   ];
 
   const maxWeekly = Math.max(...data.weekly_donations, 10); // Minimum scale of 10 to avoid exaggerated bars
@@ -86,18 +87,23 @@ export default function AdminDashboardScreen() {
 
         <View style={styles.statsGrid}>
           {stats.map(stat => (
-            <View key={stat.id} style={styles.statCard}>
+            <TouchableOpacity key={stat.id} style={styles.statCard} onPress={() => router.push(stat.route as any)}>
               <View style={[styles.iconWrapper, { backgroundColor: stat.bg }]}>
                 <Ionicons name={stat.icon as any} size={24} color={stat.color} />
               </View>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statTitle}>{stat.title}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
         <View style={styles.chartCard}>
-          <Text style={styles.cardHeader}>Weekly Donations</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+            <Text style={[styles.cardHeader, {marginBottom: 0}]}>Weekly Donations</Text>
+            <TouchableOpacity onPress={() => router.push('/(adminViews)/Analytics')}>
+              <Text style={{color: '#3b82f6', fontWeight: '600', fontSize: 14}}>View</Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.barsContainer}>
             {days.map((day, idx) => {
               const val = data.weekly_donations[idx] || 0;
@@ -134,7 +140,12 @@ export default function AdminDashboardScreen() {
         </View>
 
         <View style={styles.activityCard}>
-          <Text style={styles.cardHeader}>Recent Activity</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16}}>
+            <Text style={[styles.cardHeader, {marginBottom: 0}]}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => router.push('/(adminViews)/RecentActivity')}>
+              <Text style={{color: '#3b82f6', fontWeight: '600', fontSize: 14}}>View All</Text>
+            </TouchableOpacity>
+          </View>
           {data.recent_activity.length > 0 ? (
             data.recent_activity.map((activity: any, index: number) => (
               <View key={activity.id} style={[styles.activityRow, index === data.recent_activity.length - 1 && { borderBottomWidth: 0 }]}>

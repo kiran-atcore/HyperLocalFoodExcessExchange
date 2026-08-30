@@ -4,6 +4,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
+import * as SecureStore from 'expo-secure-store';
 
 export default function WalletScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -17,6 +18,9 @@ export default function WalletScreen() {
 
   const fetchOrders = async () => {
     try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) return;
+
       setLoading(true);
       const response = await api.get('/orders/');
       setOrders(response.data);

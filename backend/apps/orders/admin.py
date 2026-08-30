@@ -5,4 +5,4 @@ from .models import Order
 class OrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'listing', 'requester', 'status', 'created_at')
     list_filter = ('status', 'created_at')
-    search_fields = ('listing__title', 'requester__username')
+    search_fields = ('listing__title', 'requester__first_name')

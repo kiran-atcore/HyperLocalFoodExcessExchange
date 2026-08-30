@@ -23,7 +23,7 @@ export default function RejectionModal({ visible, onClose, onConfirm, loading = 
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.overlay}
       >
         <View style={styles.modalContainer}>

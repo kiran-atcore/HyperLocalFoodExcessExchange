@@ -7,14 +7,16 @@ import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
+import { generateMapPinCardHtml } from '../../components/MapPinCard';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
+import * as SecureStore from 'expo-secure-store';
 
 export default function ConsumerMapScreen() {
   const [deals, setDeals] = useState<any[]>([]);
   const [filteredDeals, setFilteredDeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
   const webViewRef = useRef<WebView>(null);
 
@@ -47,11 +49,14 @@ export default function ConsumerMapScreen() {
         sharedLocation.lat = loc.coords.latitude;
         sharedLocation.lng = loc.coords.longitude;
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const fetchDeals = async () => {
     try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) return;
+
       const response = await api.get('/listings/?listing_type=DISCOUNT');
       const now = new Date().getTime();
       const activeDeals = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
@@ -107,8 +112,8 @@ export default function ConsumerMapScreen() {
       setFilteredDeals(deals);
       return;
     }
-    const filtered = deals.filter(item => 
-      item.title.toLowerCase().includes(query) || 
+    const filtered = deals.filter(item =>
+      item.title.toLowerCase().includes(query) ||
       (item.description && item.description.toLowerCase().includes(query)) ||
       (item.donor_name && item.donor_name.toLowerCase().includes(query))
     );
@@ -120,26 +125,39 @@ export default function ConsumerMapScreen() {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2); 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    const d = R * c; 
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d = R * c;
     return d < 1 ? '< 1 km away' : `${d.toFixed(1)} km away`;
   };
 
-  const markersJs = filteredDeals.map(item => {
-    const color = '#10b981'; // Discount deals color
-    const targetLat = item.donor_latitude || item.latitude;
-    const targetLng = item.donor_longitude || item.longitude;
+  const groupedDeals = filteredDeals.reduce((acc, item) => {
+    const lat = item.donor_latitude || item.latitude || 8.5241;
+    const lng = item.donor_longitude || item.longitude || 76.9366;
+    const key = `${lat}_${lng}`.replace(/\./g, '_');
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const markersJs = Object.values(groupedDeals).map((group: any) => {
+    const sortedGroup = [...group].sort((a: any, b: any) => b.id - a.id);
+    const first = sortedGroup[0];
+    const targetLat = first.donor_latitude || first.latitude || 8.5241;
+    const targetLng = first.donor_longitude || first.longitude || 76.9366;
     const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
-    const displayPrice = item.discounted_price ? `$${Number(item.discounted_price).toFixed(2)}` : 'FREE';
+    const safeDonor = (first.donor_name || 'Vendor').replace(/'/g, "\\'").replace(/\n|\r/g, ' ');
+    const groupId = `${targetLat}_${targetLng}`.replace(/\./g, '_');
+
+    const popupHtml = generateMapPinCardHtml(sortedGroup, distStr, safeDonor, groupId);
 
     return `
-      var m_${item.id} = L.marker([${targetLat || 37.78825}, ${targetLng || -122.4324}]).addTo(map);
-      mapMarkers[${item.id}] = m_${item.id};
-      markerExpirations[${item.id}] = '${item.pickup_end || ''}';
-      m_${item.id}.bindPopup('<div onclick="handleCardClick(${item.id})" style="font-family: sans-serif; text-align: center; cursor: pointer;"><b>${item.title.replace(/'/g, "\\'")}</b><br/><span style="color: #64748b;">${(item.donor_name || 'Vendor').replace(/'/g, "\\'")}</span><br/><span style="color: ${color}; font-weight: bold;">${displayPrice}</span><br/><small style="color: #64748b; font-weight: bold;">${distStr}</small><br/><small class="countdown-timer" data-expires="${item.pickup_end || ''}" style="color: #f59e0b; font-weight: bold;">Calculating time...</small><br/><button onclick="event.stopPropagation(); handleBuyClick(${item.id})" style="width: 100%; border: none; margin-top: 8px; padding: 8px; background: #0f172a; color: white; border-radius: 4px; font-weight: bold; font-size: 13px; cursor: pointer;">Buy Now</button></div>');
+      var m_${first.id} = L.marker([${targetLat}, ${targetLng}]).addTo(map);
+      mapMarkers[${first.id}] = m_${first.id};
+      ${sortedGroup.map((item: any) => `markerExpirations[${item.id}] = '${item.pickup_end || ''}';`).join(' ')}
+      m_${first.id}.bindPopup(\`${popupHtml.replace(/`/g, '\\`')}\`);
     `;
   }).join('\n');
 
@@ -169,10 +187,10 @@ export default function ConsumerMapScreen() {
         });
         L.Marker.prototype.options.icon = DefaultIcon;
 
-        var initialLat = ${userLocation ? userLocation.lat : 37.78825};
-        var initialLng = ${userLocation ? userLocation.lng : -122.4324};
+        var initialLat = ${userLocation ? userLocation.lat : 8.5241};
+        var initialLng = ${userLocation ? userLocation.lng : 76.9366};
         var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLng], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap © CARTO'
         }).addTo(map);
@@ -197,8 +215,31 @@ export default function ConsumerMapScreen() {
           map.setView([lat, lng], 14);
         }
 
-        function handleBuyClick(id) {
+        function handleClaimClick(id) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type: 'buy', id: id}));
+        }
+
+        function toggleAccordion(event, groupId, id) {
+           event.stopPropagation();
+           var allContents = document.querySelectorAll('.group_' + groupId);
+           var targetContent = document.getElementById('content_' + id);
+           var targetIcon = document.getElementById('icon_' + id);
+           
+           var isCurrentlyOpen = targetContent.style.display === 'block';
+           
+           // Close all
+           allContents.forEach(function(el) {
+              el.style.display = 'none';
+              var iconId = el.id.replace('content_', 'icon_');
+              var iconEl = document.getElementById(iconId);
+              if (iconEl) iconEl.innerText = '+';
+           });
+           
+           // Open the clicked one if it was closed
+           if (!isCurrentlyOpen) {
+              targetContent.style.display = 'block';
+              if (targetIcon) targetIcon.innerText = '−';
+           }
         }
 
         function handleCardClick(id) {
@@ -214,9 +255,9 @@ export default function ConsumerMapScreen() {
              if (expires) {
                  var target = new Date(expires).getTime();
                  if (target - now <= 0) {
-                     if (mapMarkers[id]) {
-                         map.removeLayer(mapMarkers[id]);
-                         delete mapMarkers[id];
+                     var itemContainer = document.getElementById('item_container_' + id);
+                     if (itemContainer) {
+                         itemContainer.style.display = 'none';
                      }
                  }
              }
@@ -270,7 +311,6 @@ export default function ConsumerMapScreen() {
         </View>
       ) : (
         <WebView
-          key={filteredDeals.length}
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: leafletHtml }}
@@ -282,10 +322,10 @@ export default function ConsumerMapScreen() {
       )}
 
       {etaModalListing && (
-        <EtaSelectionModal 
-          visible={!!etaModalListing} 
-          onClose={() => setEtaModalListing(null)} 
-          onConfirm={submitBuyNow} 
+        <EtaSelectionModal
+          visible={!!etaModalListing}
+          onClose={() => setEtaModalListing(null)}
+          onConfirm={submitBuyNow}
           pickupEnd={etaModalListing.pickup_end}
           showQuantity={true}
           maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}

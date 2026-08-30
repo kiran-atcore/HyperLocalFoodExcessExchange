@@ -127,7 +127,7 @@ export default function ShelterFeedScreen() {
     const isClaimed = item.is_claimed || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
     const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
 
-    if (activeTab === 'DISCOUNT') {
+    if (item.listing_type === 'DISCOUNT') {
       const origPrice = Number(item.original_price) || 0;
       const discPrice = Number(item.discounted_price) || 0;
       let discountPercent = 0;
@@ -223,13 +223,23 @@ export default function ShelterFeedScreen() {
         <View style={styles.tabContainer}>
           <TouchableOpacity 
             style={[styles.tabButton, activeTab === 'DONATION' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('DONATION')}
+            onPress={() => {
+              if (activeTab !== 'DONATION') {
+                setFeed([]);
+                setActiveTab('DONATION');
+              }
+            }}
           >
             <Text style={[styles.tabText, activeTab === 'DONATION' && styles.tabTextActive]}>NGO Donations</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.tabButton, activeTab === 'DISCOUNT' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('DISCOUNT')}
+            onPress={() => {
+              if (activeTab !== 'DISCOUNT') {
+                setFeed([]);
+                setActiveTab('DISCOUNT');
+              }
+            }}
           >
             <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.tabTextActive]}>Discounted Surplus</Text>
           </TouchableOpacity>

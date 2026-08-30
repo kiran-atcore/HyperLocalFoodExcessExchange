@@ -29,7 +29,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'role', 'email']
         
     def get_name(self, obj):
-        return obj.business_name if obj.business_name else obj.username
+        return obj.business_name if obj.business_name else obj.first_name
 
 class OrderSerializer(serializers.ModelSerializer):
     listing_details = SimpleListingSerializer(source='listing', read_only=True)

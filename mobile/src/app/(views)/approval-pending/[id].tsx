@@ -7,17 +7,18 @@ import { router } from 'expo-router';
 import api from '../../../utils/api';
 
 export default function ApprovalPendingScreen() {
-  const { logout, approvalStatus, rejectionCount, rejectionReason, userRole, isAuthenticated } = useContext(AuthContext);
+  const { logout, updateApprovalState, approvalStatus, rejectionCount, rejectionReason, userRole, isAuthenticated } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
 
   const handleReRequest = async () => {
     setLoading(true);
     try {
       await api.post('/users/me/re_request/');
+      updateApprovalState('PENDING');
       Alert.alert(
         "Re-request Submitted",
-        "Your account is back under review. Please log in again to refresh your session.",
-        [{ text: "OK", onPress: () => logout() }]
+        "Your account is back under review. We will notify you once your account has been approved.",
+        [{ text: "OK" }]
       );
     } catch (e) {
       Alert.alert("Error", "Could not submit re-request. Please try again.");
@@ -28,9 +29,9 @@ export default function ApprovalPendingScreen() {
 
   const navigateToEdit = () => {
     if (userRole === 'donor') {
-      router.push('/(forms)/edit-kitchen-profile/new');
+      router.push('/(forms)/edit-kitchen-profile/me' as any);
     } else {
-      router.push('/(forms)/edit-shelter-profile/new');
+      router.push('/(forms)/edit-shelter-profile/me' as any);
     }
   };
 

@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { jwtDecode } from 'jwt-decode';
 import { router } from 'expo-router';
 import api from '../utils/api';
+import { clearSharedLocation } from '../utils/sharedState';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -14,6 +15,7 @@ interface AuthContextType {
   rejectionReason: string | null;
   login: (access: string, refresh: string) => Promise<void>;
   logout: (skipApiCall?: boolean) => Promise<void>;
+  updateApprovalState: (status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED') => void;
   loading: boolean;
 }
 
@@ -27,6 +29,7 @@ export const AuthContext = createContext<AuthContextType>({
   rejectionReason: null,
   login: async () => {},
   logout: async () => {},
+  updateApprovalState: () => {},
   loading: true,
 });
 
@@ -56,6 +59,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setRejectionCount(decoded.rejection_count || 0);
         setRejectionReason(decoded.rejection_reason || null);
         setIsAuthenticated(true);
+
+        // Fetch latest profile to ensure approval status is up to date with the database
+        try {
+          const response = await api.get('/users/me/');
+          const user = response.data;
+          setIsApproved(!!user.is_approved);
+          setApprovalStatus(user.approval_status || 'PENDING');
+          setRejectionCount(user.rejection_count || 0);
+          setRejectionReason(user.rejection_reason || null);
+        } catch (apiErr) {
+          // Ignore API error (e.g. offline), fallback to token claims
+        }
       }
     } catch (e) {
       console.error('Failed to restore token', e);
@@ -92,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     await SecureStore.deleteItemAsync('access_token');
     await SecureStore.deleteItemAsync('refresh_token');
+    clearSharedLocation();
     setUserRole(null);
     setUserEmail(null);
     setIsApproved(false);
@@ -102,8 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     router.replace('/(auth)/login');
   };
 
+  const updateApprovalState = (status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BANNED') => {
+    setApprovalStatus(status);
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, userRole, userEmail, isApproved, approvalStatus, rejectionCount, rejectionReason, login, logout, loading }}>
+    <AuthContext.Provider value={{ isAuthenticated, userRole, userEmail, isApproved, approvalStatus, rejectionCount, rejectionReason, login, logout, updateApprovalState, loading }}>
       {children}
     </AuthContext.Provider>
   );

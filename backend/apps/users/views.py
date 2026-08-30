@@ -12,12 +12,26 @@ from django.db.models import Sum
 from apps.listings.models import FoodListing
 from apps.orders.models import Order
 
+from .models import ActivityLog
+
 User = get_user_model()
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
     serializer_class = RegisterSerializer
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        action_text = "registered as"
+        if user.role in ['donor', 'shelter'] and user.approval_status == 'PENDING':
+            action_text = "requested as"
+        
+        ActivityLog.objects.create(
+            text=f"User {user.first_name or user.email} {action_text} {user.role}",
+            type="user",
+            related_user=user
+        )
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -59,6 +73,27 @@ class UserDetailView(generics.RetrieveAPIView):
             return User.objects.none()
         return super().get_queryset()
 
+class AdminUserListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.role != 'admin':
+            return User.objects.none()
+            
+        queryset = User.objects.exclude(role='admin').order_by('-date_joined')
+        
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+            
+        is_approved = self.request.query_params.get('is_approved')
+        if is_approved is not None:
+            is_approved = is_approved.lower() == 'true'
+            queryset = queryset.filter(is_approved=is_approved)
+            
+        return queryset
+
 class PendingApprovalsView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
@@ -79,6 +114,13 @@ class ApproveUserView(APIView):
             user_to_approve.is_approved = True
             user_to_approve.approval_status = 'APPROVED'
             user_to_approve.save()
+            
+            ActivityLog.objects.create(
+                text=f"User {user_to_approve.first_name or user_to_approve.email} was approved",
+                type="approval",
+                related_user=user_to_approve
+            )
+            
             return Response({"message": "User approved successfully"})
         except User.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -104,6 +146,20 @@ class RejectUserView(APIView):
                 user_to_reject.approval_status = 'REJECTED'
             user_to_reject.save()
             
+            reason_suffix = f" - {reason}" if reason else ""
+            if user_to_reject.rejection_count >= 3:
+                ActivityLog.objects.create(
+                    text=f"User {user_to_reject.first_name or user_to_reject.email} was permanently banned{reason_suffix}",
+                    type="ban",
+                    related_user=user_to_reject
+                )
+            else:
+                ActivityLog.objects.create(
+                    text=f"User {user_to_reject.first_name or user_to_reject.email} was rejected{reason_suffix}",
+                    type="rejection",
+                    related_user=user_to_reject
+                )
+            
             return Response({
                 "message": f"User rejected. Rejection count: {user_to_reject.rejection_count}",
                 "approval_status": user_to_reject.approval_status
@@ -120,6 +176,13 @@ class ReRequestApprovalView(APIView):
             user.approval_status = 'PENDING'
             user.rejection_reason = None # Clear reason on re-request
             user.save()
+            
+            ActivityLog.objects.create(
+                text=f"User {user.first_name or user.email} re-requested approval",
+                type="rerequest",
+                related_user=user
+            )
+            
             return Response({"message": "Approval re-requested successfully", "approval_status": "PENDING"})
         return Response({"error": "Cannot re-request approval"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -152,29 +215,16 @@ class AdminDashboardStatsView(APIView):
             weekly_donations.append(count)
             
         # 5. Recent Activity
-        # Fetch 2 latest users and 2 latest food listings
-        latest_users = User.objects.order_by('-date_joined')[:2]
-        latest_listings = FoodListing.objects.order_by('-created_at')[:2]
+        logs = ActivityLog.objects.order_by('-timestamp')[:5]
         
         activities = []
-        for u in latest_users:
+        for log in logs:
             activities.append({
-                "id": f"u_{u.id}",
-                "text": f"User {u.username} registered as {u.role}",
-                "time": u.date_joined,
-                "type": "user"
+                "id": f"log_{log.id}",
+                "text": log.text,
+                "time": log.timestamp,
+                "type": log.type
             })
-            
-        for l in latest_listings:
-            activities.append({
-                "id": f"l_{l.id}",
-                "text": f"New listing: {l.title} from {l.donor.business_name or l.donor.username}",
-                "time": l.created_at,
-                "type": "donation"
-            })
-            
-        # Sort by time descending
-        activities.sort(key=lambda x: x['time'], reverse=True)
         
         # Format time for UI (basic string)
         from django.utils.timesince import timesince
@@ -192,4 +242,80 @@ class AdminDashboardStatsView(APIView):
             "successful_pickups": successful_pickups,
             "weekly_donations": weekly_donations,
             "recent_activity": activities
+        })
+
+class ActivityLogListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.role != 'admin':
+            return ActivityLog.objects.none()
+        return ActivityLog.objects.all().order_by('-timestamp')
+        
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        
+        activities = []
+        for log in queryset:
+            activities.append({
+                "id": f"log_{log.id}",
+                "text": log.text,
+                "time": log.timestamp,
+                "type": log.type
+            })
+            
+        from django.utils.timesince import timesince
+        for a in activities:
+            now = timezone.now()
+            time_str = timesince(a['time'], now).split(',')[0]
+            a['time'] = f"{time_str} ago"
+            
+        return Response(activities)
+
+class AdminAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'admin':
+            return Response({"error": "Unauthorized"}, status=status.HTTP_403_FORBIDDEN)
+
+        # 1. User Distribution
+        total_consumers = User.objects.filter(role='consumer').count()
+        total_donors = User.objects.filter(role='donor', is_approved=True).count()
+        total_shelters = User.objects.filter(role='shelter', is_approved=True).count()
+
+        # 2. Order Outcomes
+        picked_up = Order.objects.filter(status='PICKED_UP').count()
+        cancelled = Order.objects.filter(status='CANCELLED').count()
+        expired = Order.objects.filter(status='EXPIRED').count()
+        pending = Order.objects.filter(status='PENDING').count()
+
+        # 3. Weekly Donations (Rolling 7 days)
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=6)
+        
+        weekly_donations = []
+        weekly_labels = []
+        for i in range(7):
+            day = start_of_week + timedelta(days=i)
+            count = FoodListing.objects.filter(created_at__date=day).count()
+            weekly_donations.append(count)
+            weekly_labels.append(day.strftime("%a"))
+
+        return Response({
+            "user_distribution": [
+                {"label": "Consumers", "value": total_consumers, "color": "#3b82f6"},
+                {"label": "Donors", "value": total_donors, "color": "#f59e0b"},
+                {"label": "Shelters", "value": total_shelters, "color": "#8b5cf6"}
+            ],
+            "order_outcomes": [
+                {"label": "Picked Up", "value": picked_up, "color": "#10b981"},
+                {"label": "Cancelled", "value": cancelled, "color": "#ef4444"},
+                {"label": "Expired", "value": expired, "color": "#64748b"},
+                {"label": "Pending", "value": pending, "color": "#eab308"}
+            ],
+            "weekly_donations": {
+                "values": weekly_donations,
+                "labels": weekly_labels
+            }
         })

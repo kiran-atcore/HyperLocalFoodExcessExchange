@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,8 @@ import CountdownTimer from '../../components/CountdownTimer';
 export default function DonorDashboardScreen() {
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'DONATION' | 'DISCOUNT'>('DONATION');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -122,11 +124,46 @@ export default function DonorDashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Active Surplus</Text>
+      
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
+        <TextInput 
+          style={styles.searchInput}
+          placeholder="Search by title or description..."
+          placeholderTextColor="#94a3b8"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+      
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'DONATION' && styles.activeTab]} 
+          onPress={() => setActiveTab('DONATION')}
+        >
+          <Text style={[styles.tabText, activeTab === 'DONATION' && styles.activeTabText]}>Donations</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'DISCOUNT' && styles.activeTab]} 
+          onPress={() => setActiveTab('DISCOUNT')}
+        >
+          <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.activeTabText]}>Discounted</Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
       ) : (
         <FlatList 
-          data={listings.filter(item => item.donor_status !== 'Picked Up')} 
+          data={listings.filter(item => {
+            const matchesTab = item.listing_type === activeTab;
+            const notPickedUp = item.donor_status !== 'Picked Up';
+            const query = searchQuery.toLowerCase();
+            const matchesSearch = query === '' || 
+              (item.title && item.title.toLowerCase().includes(query)) || 
+              (item.description && item.description.toLowerCase().includes(query));
+            return matchesTab && notPickedUp && matchesSearch;
+          })}
           renderItem={renderItem} 
           keyExtractor={item => item.id.toString()} 
           contentContainerStyle={{ paddingBottom: 100 }}
@@ -144,6 +181,14 @@ export default function DonorDashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
   header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
+  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 8, paddingHorizontal: 12, marginBottom: 16, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, height: 44, fontSize: 16, color: '#1e293b' },
+  tabsContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4, marginBottom: 16 },
+  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
+  activeTab: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  tabText: { color: '#64748b', fontWeight: 'bold' },
+  activeTabText: { color: '#0f172a' },
   card: { backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   title: { fontSize: 18, fontWeight: 'bold', color: '#1e293b' },

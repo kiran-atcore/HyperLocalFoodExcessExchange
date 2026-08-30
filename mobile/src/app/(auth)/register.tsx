@@ -35,33 +35,29 @@ export default function RegisterScreen() {
     setErrorMsg('');
     setIsLoading(true);
     try {
-      const generatedUsername = data.email.trim().split('@')[0].replace(/[^a-zA-Z0-9]/g, '') + Math.floor(Math.random() * 10000);
-      
       if (role === 'donor' || role === 'shelter') {
         // Defer registration to the profile setup screen
         const params = {
           email: data.email.trim(),
           password: data.password,
           business_name: data.business_name,
-          username: generatedUsername,
           role: role
         };
-        
+
         if (role === 'donor') {
-          router.replace({ pathname: '/(forms)/edit-kitchen-profile/new', params });
+          router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
         } else {
-          router.replace({ pathname: '/(forms)/edit-shelter-profile/new', params });
+          router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
         }
       } else {
         // Consumers can register immediately (no profile setup required)
         await api.post('/users/register/', {
-          username: generatedUsername,
           business_name: data.business_name,
           email: data.email.trim(),
           password: data.password,
           role: role
         });
-        
+
         const loginRes = await api.post('/users/login/', {
           email: data.email.trim(),
           password: data.password,
@@ -84,85 +80,88 @@ export default function RegisterScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
+          <Text style={styles.title}>Create Account</Text>
 
-      {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-      
-      <View style={styles.roleContainer}>
-        <TouchableOpacity style={[styles.roleBtn, role === 'consumer' && styles.roleActive]} onPress={() => setRole('consumer')}>
-          <Text style={[styles.roleText, role === 'consumer' && styles.roleTextActive]}>Consumer</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.roleBtn, role === 'donor' && styles.roleActive]} onPress={() => setRole('donor')}>
-          <Text style={[styles.roleText, role === 'donor' && styles.roleTextActive]}>Kitchen</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.roleBtn, role === 'shelter' && styles.roleActive]} onPress={() => setRole('shelter')}>
-          <Text style={[styles.roleText, role === 'shelter' && styles.roleTextActive]}>Shelter</Text>
-        </TouchableOpacity>
-      </View>
+          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
 
-      <View style={styles.inputContainer}>
-        <Controller
-          control={control}
-          name="business_name"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <>
-              <TextInput style={[styles.input, errors.business_name && styles.inputError]} placeholder="Full Name or Org Name" onBlur={onBlur} onChangeText={onChange} value={value} />
-              {errors.business_name && <Text style={styles.validationError}>{errors.business_name.message}</Text>}
-            </>
-          )}
-        />
-        
-        <Controller
-          control={control}
-          name="email"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <>
-              <TextInput style={[styles.input, errors.email && styles.inputError]} placeholder="Email Address" onBlur={onBlur} onChangeText={onChange} value={value} autoCapitalize="none" />
-              {errors.email && <Text style={styles.validationError}>{errors.email.message}</Text>}
-            </>
-          )}
-        />
+          <View style={styles.roleContainer}>
+            <TouchableOpacity style={[styles.roleBtn, role === 'consumer' && styles.roleActive]} onPress={() => setRole('consumer')}>
+              <Text style={[styles.roleText, role === 'consumer' && styles.roleTextActive]}>Consumer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.roleBtn, role === 'donor' && styles.roleActive]} onPress={() => setRole('donor')}>
+              <Text style={[styles.roleText, role === 'donor' && styles.roleTextActive]}>Kitchen</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.roleBtn, role === 'shelter' && styles.roleActive]} onPress={() => setRole('shelter')}>
+              <Text style={[styles.roleText, role === 'shelter' && styles.roleTextActive]}>Shelter</Text>
+            </TouchableOpacity>
+          </View>
 
-        <Controller
-          control={control}
-          name="password"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <>
-              <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
-                <TextInput style={styles.passwordInput} placeholder="Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showPassword} />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                  <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-              {errors.password && <Text style={styles.validationError}>{errors.password.message}</Text>}
-            </>
-          )}
-        />
+          <View style={styles.inputContainer}>
+            <Controller
+              control={control}
+              name="business_name"
+              render={({ field: { onChange, onBlur, value } }) => {
+                const placeholderText = role === 'consumer' ? 'Full Name' : role === 'donor' ? 'Business Name' : 'Organization Name';
+                return (
+                  <>
+                    <TextInput style={[styles.input, errors.business_name && styles.inputError]} placeholder={placeholderText} onBlur={onBlur} onChangeText={onChange} value={value} />
+                    {errors.business_name && <Text style={styles.validationError}>{errors.business_name.message}</Text>}
+                  </>
+                );
+              }}
+            />
 
-        <Controller
-          control={control}
-          name="confirmPassword"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <>
-              <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
-                <TextInput style={styles.passwordInput} placeholder="Confirm Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showConfirmPassword} />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                  <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
-                </TouchableOpacity>
-              </View>
-              {errors.confirmPassword && <Text style={styles.validationError}>{errors.confirmPassword.message}</Text>}
-            </>
-          )}
-        />
-      </View>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <>
+                  <TextInput style={[styles.input, errors.email && styles.inputError]} placeholder="Email Address" onBlur={onBlur} onChangeText={onChange} value={value} autoCapitalize="none" />
+                  {errors.email && <Text style={styles.validationError}>{errors.email.message}</Text>}
+                </>
+              )}
+            />
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={isLoading}>
-        {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
-      </TouchableOpacity>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <>
+                  <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
+                    <TextInput style={styles.passwordInput} placeholder="Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showPassword} />
+                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                  {errors.password && <Text style={styles.validationError}>{errors.password.message}</Text>}
+                </>
+              )}
+            />
 
-      <TouchableOpacity style={styles.linkButton} onPress={() => router.back()}>
-        <Text style={styles.linkText}>Already have an account? Log in</Text>
-      </TouchableOpacity>
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <>
+                  <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
+                    <TextInput style={styles.passwordInput} placeholder="Confirm Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showConfirmPassword} />
+                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                      <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
+                    </TouchableOpacity>
+                  </View>
+                  {errors.confirmPassword && <Text style={styles.validationError}>{errors.confirmPassword.message}</Text>}
+                </>
+              )}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={isLoading}>
+            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.linkButton} onPress={() => router.back()}>
+            <Text style={styles.linkText}>Already have an account? Log in</Text>
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -8,8 +8,8 @@ import { DeviceEventEmitter } from 'react-native';
 
 export default function MapSelectionScreen() {
   const params = useLocalSearchParams();
-  const initialLat = params.lat ? parseFloat(params.lat as string) : 37.78825;
-  const initialLng = params.lng ? parseFloat(params.lng as string) : -122.4324;
+  const initialLat = params.lat ? parseFloat(params.lat as string) : 8.5241;
+  const initialLng = params.lng ? parseFloat(params.lng as string) : 76.9366;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -93,10 +93,11 @@ export default function MapSelectionScreen() {
     <body>
       <div id="map"></div>
       <script>
-        var map = L.map('map', { zoomControl: false }).setView([${selectedCoords.lat}, ${selectedCoords.lng}], 13);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([${selectedCoords.lat}, ${selectedCoords.lng}], 13);
+        // Use OpenStreetMap to avoid API Key watermarks
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
-          attribution: '© OpenStreetMap'
+          attribution: ''
         }).addTo(map);
 
         var marker = L.marker([${selectedCoords.lat}, ${selectedCoords.lng}], {

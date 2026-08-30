@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { WebView } from 'react-native-webview';
+import MiniMap from '../../../components/MiniMap';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import api from '../../../utils/api';
 import CountdownTimer from '../../../components/CountdownTimer';
@@ -50,39 +50,6 @@ export default function DonationViewScreen() {
       setIsClaiming(false);
     }
   };
-
-  const leafletHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>
-        body { padding: 0; margin: 0; }
-        html, body, #map { height: 100%; width: 100vw; }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        var map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([${listing?.donor_latitude || listing?.latitude || 37.78825}, ${listing?.donor_longitude || listing?.longitude || -122.4324}], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        L.circleMarker([${listing?.donor_latitude || listing?.latitude || 37.78825}, ${listing?.donor_longitude || listing?.longitude || -122.4324}], {
-          color: '#3b82f6',
-          fillColor: '#3b82f6',
-          fillOpacity: 0.9,
-          radius: 12,
-          weight: 2
-        }).addTo(map);
-      </script>
-    </body>
-    </html>
-  `;
 
   if (loading) {
     return (
@@ -142,13 +109,7 @@ export default function DonationViewScreen() {
 
         <Text style={styles.sectionTitle}>Pickup Location</Text>
         <View style={styles.mapContainer}>
-          <WebView
-            originWhitelist={['*']}
-            source={{ html: leafletHtml }}
-            style={styles.map}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-          />
+          <MiniMap latitude={listing?.donor_latitude || listing?.latitude || 8.5241} longitude={listing?.donor_longitude || listing?.longitude || 76.9366} />
         </View>
       </View>
       

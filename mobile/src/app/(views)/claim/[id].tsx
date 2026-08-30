@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import MiniMap from '../../../components/MiniMap';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
-import { WebView } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import api from '../../../utils/api';
@@ -105,42 +105,6 @@ export default function ClaimDetailScreen() {
     }
   };
 
-  const leafletHtml = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-      <style>
-        body { padding: 0; margin: 0; }
-        html, body, #map { height: 100%; width: 100%; }
-        .leaflet-popup-content-wrapper { border-radius: 8px; }
-      </style>
-    </head>
-    <body>
-      <div id="map"></div>
-      <script>
-        var map = L.map('map', { zoomControl: false, dragging: false, scrollWheelZoom: false }).setView([${order.listing_details?.donor_latitude || order.listing_details?.latitude || 37.78825}, ${order.listing_details?.donor_longitude || order.listing_details?.longitude || -122.4324}], 15);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        var DefaultIcon = L.icon({
-            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41]
-        });
-        L.Marker.prototype.options.icon = DefaultIcon;
-
-        L.marker([${order.listing_details?.donor_latitude || order.listing_details?.latitude || 37.78825}, ${order.listing_details?.donor_longitude || order.listing_details?.longitude || -122.4324}]).addTo(map);
-      </script>
-    </body>
-    </html>
-  `;
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -204,13 +168,9 @@ export default function ClaimDetailScreen() {
 
             <Text style={styles.sectionTitle}>Pickup Location</Text>
             <View style={styles.mapContainer}>
-              <WebView
-                originWhitelist={['*']}
-                source={{ html: leafletHtml }}
-                style={styles.map}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                scrollEnabled={false}
+              <MiniMap 
+                latitude={order.listing_details?.donor_latitude || order.listing_details?.latitude || 8.5241} 
+                longitude={order.listing_details?.donor_longitude || order.listing_details?.longitude || 76.9366} 
               />
             </View>
           </>

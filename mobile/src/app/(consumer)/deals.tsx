@@ -8,6 +8,7 @@ import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
 import CountdownTimer from '../../components/CountdownTimer';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
+import * as SecureStore from 'expo-secure-store';
 
 export default function ConsumerFeedScreen() {
   const [feed, setFeed] = useState<any[]>([]);
@@ -90,6 +91,9 @@ export default function ConsumerFeedScreen() {
 
   const fetchFeed = async () => {
     try {
+      const token = await SecureStore.getItemAsync('access_token');
+      if (!token) return;
+
       setLoading(true);
       const [listingsRes, profileRes] = await Promise.all([
         api.get('/listings/?listing_type=DISCOUNT'),
@@ -226,8 +230,8 @@ export default function ConsumerFeedScreen() {
         autoFetch={false} 
         onLocationChange={handleLocationChange} 
         onMapPress={() => {
-          const lat = location?.lat || sharedLocation.lat || 37.78825;
-          const lng = location?.lng || sharedLocation.lng || -122.4324;
+          const lat = location?.lat || sharedLocation.lat || 8.5241;
+          const lng = location?.lng || sharedLocation.lng || 76.9366;
           router.push(`/(views)/map/picker?lat=${lat}&lng=${lng}` as any);
         }}
       />

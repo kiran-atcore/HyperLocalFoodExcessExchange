@@ -8,23 +8,23 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'username', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason', 'first_name', 'last_name']
+        fields = ['id', 'email', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason', 'first_name', 'last_name']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     
     class Meta:
         model = User
-        fields = ['email', 'username', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'first_name', 'last_name']
+        fields = ['email', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'first_name', 'last_name']
         
     def create(self, validated_data):
         role = validated_data.get('role', 'consumer')
         is_approved = True if role in ['consumer', 'admin'] else False
         approval_status = 'APPROVED' if is_approved else 'PENDING'
         
-        user = User.objects.create(
+        user = User.objects.create_user(
             email=validated_data['email'],
-            username=validated_data['username'],
+            password=validated_data['password'],
             role=role,
             business_name=validated_data.get('business_name', ''),
             phone_number=validated_data.get('phone_number', ''),
@@ -36,8 +36,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             is_approved=is_approved,
             approval_status=approval_status
         )
-        user.set_password(validated_data['password'])
-        user.save()
         return user
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

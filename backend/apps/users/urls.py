@@ -2,11 +2,14 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, CustomTokenObtainPairView, DeleteAccountView, 
-    LogoutView, UserProfileView, PendingApprovalsView, ApproveUserView, RejectUserView, UserDetailView, ReRequestApprovalView, AdminDashboardStatsView
+    LogoutView, UserProfileView, PendingApprovalsView, ApproveUserView, RejectUserView, UserDetailView, ReRequestApprovalView, AdminDashboardStatsView, AdminUserListView, ActivityLogListView, AdminAnalyticsView
 )
 
 urlpatterns = [
     path('admin/stats/', AdminDashboardStatsView.as_view(), name='admin_stats'),
+    path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin_analytics'),
+    path('admin/list/', AdminUserListView.as_view(), name='admin_user_list'),
+    path('admin/activity-logs/', ActivityLogListView.as_view(), name='admin_activity_logs'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', CustomTokenObtainPairView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

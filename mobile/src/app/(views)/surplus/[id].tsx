@@ -186,6 +186,30 @@ export default function SurplusDetailScreen() {
           </>
         )}
 
+        {listing.listing_type === 'DISCOUNT' && (
+          <>
+            <Text style={styles.sectionTitle}>Price Details</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Original Price:</Text>
+                <Text style={[styles.infoValue, { textDecorationLine: 'line-through', color: '#94a3b8' }]}>
+                  ₹{Number(listing.original_price).toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Discounted Price:</Text>
+                <Text style={styles.infoValue}>₹{Number(listing.discounted_price).toFixed(2)}</Text>
+              </View>
+              <View style={[styles.infoRow, { borderBottomWidth: 0, paddingBottom: 0 }]}>
+                <Text style={styles.infoLabel}>Discount:</Text>
+                <Text style={[styles.infoValue, { color: '#10b981' }]}>
+                  {Math.round(((Number(listing.original_price) - Number(listing.discounted_price)) / Number(listing.original_price)) * 100)}% OFF
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {listing.additional_details ? (
           <>
             <Text style={styles.sectionTitle}>Additional Details</Text>
