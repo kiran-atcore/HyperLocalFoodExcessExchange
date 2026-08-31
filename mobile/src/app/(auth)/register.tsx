@@ -1,16 +1,19 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions, Animated, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useContext, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AuthContext } from '../../context/AuthContext';
-import api from '../../utils/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import InputField from '../../components/InputField';
+
+const { width } = Dimensions.get('window');
 
 const schema = yup.object().shape({
-  business_name: yup.string().required('Name is required'),
   email: yup.string().email('Invalid email').required('Email is required'),
   password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
   confirmPassword: yup.string()
@@ -23,23 +26,187 @@ export default function RegisterScreen() {
   const [role, setRole] = useState('consumer');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Segmented Control Animation Values
+  const [segmentWidth, setSegmentWidth] = useState(0);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
 
-  const { control, handleSubmit, formState: { errors } } = useForm({
-    resolver: yupResolver(schema),
-    defaultValues: { business_name: '', email: '', password: '', confirmPassword: '' }
+  const ROLES = [
+    { id: 'consumer', label: 'Consumer', icon: 'person' as const },
+    { id: 'donor', label: 'Kitchen', icon: 'restaurant' as const },
+    { id: 'shelter', label: 'Shelter', icon: 'home' as const },
+  ];
+
+  // Entrance Animation Values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(80)).current;
+  const cardScale = useRef(new Animated.Value(0.9)).current;
+  const cardRotateX = useRef(new Animated.Value(-20)).current;
+  const staggerAnims = useRef([...Array(5)].map(() => new Animated.Value(0))).current;
+
+  // Background Blob Animation Values
+  const blob1 = useRef(new Animated.Value(0)).current;
+  const blob2 = useRef(new Animated.Value(0)).current;
+  const blob3 = useRef(new Animated.Value(0)).current;
+  const blob4 = useRef(new Animated.Value(0)).current;
+
+  // Premium Button Animation Values
+  const btnScaleAnim = useRef(new Animated.Value(1)).current;
+  const arrowTranslateX = useRef(new Animated.Value(0)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  // Logo Animation Values
+  const logoScale = useRef(new Animated.Value(0)).current;
+  const logoFloat = useRef(new Animated.Value(0)).current;
+
+  // Animate the sliding segmented control highlight
+  useEffect(() => {
+    if (segmentWidth > 0) {
+      const index = ROLES.findIndex(r => r.id === role);
+      Animated.spring(indicatorAnim, {
+        toValue: index * segmentWidth,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 8,
+      }).start();
+    }
+  }, [role, segmentWidth]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 20,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardScale, {
+        toValue: 1,
+        tension: 20,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardRotateX, {
+        toValue: 0,
+        tension: 20,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.stagger(150, staggerAnims.map(anim =>
+          Animated.spring(anim, {
+            toValue: 1,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          })
+        ))
+      ]),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 60,
+        friction: 6,
+        delay: 500,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    // Ambient Logo Float
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoFloat, { toValue: 1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(logoFloat, { toValue: 0, duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Looped Ambient Blob Animations
+    const animateBlob = (anim: Animated.Value, duration: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, {
+            toValue: 1,
+            duration: duration,
+            useNativeDriver: true,
+          }),
+          Animated.timing(anim, {
+            toValue: 0,
+            duration: duration,
+            useNativeDriver: true,
+          })
+        ])
+      ).start();
+    };
+
+    animateBlob(blob1, 6000);
+    animateBlob(blob2, 7500);
+    animateBlob(blob3, 5000);
+    animateBlob(blob4, 8000);
+
+    // Premium Button Pulsing Glow
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 2500, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const getBlobStyle = (anim: Animated.Value, moveX: number, moveY: number, maxScale: number) => ({
+    transform: [
+      {
+        translateX: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-moveX, moveX],
+        })
+      },
+      {
+        translateY: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [-moveY, moveY],
+        })
+      },
+      {
+        scale: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, maxScale],
+        })
+      },
+      {
+        rotate: anim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '360deg'],
+        })
+      }
+    ]
   });
 
+  const { control, handleSubmit, formState: { errors }, setValue, reset } = useForm({
+    resolver: yupResolver(schema),
+    defaultValues: { email: '', password: '', confirmPassword: '' }
+  });
+
+  // Clear the form state every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      reset();
+      setErrorMsg('');
+    }, [reset])
+  );
+
   const onSubmit = async (data: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setErrorMsg('');
     setIsLoading(true);
     try {
-      // Defer registration to the profile setup screen for all roles
       const params = {
         email: data.email.trim(),
         password: data.password,
-        business_name: data.business_name,
         role: role
       };
 
@@ -51,6 +218,7 @@ export default function RegisterScreen() {
         router.replace({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { ...params, id: 'new' } });
       }
     } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       if (err.response?.data?.email) {
         setErrorMsg('Email is already in use. Please log in.');
       } else {
@@ -62,115 +230,495 @@ export default function RegisterScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>Create Account</Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <LinearGradient
+          colors={['#0F766E', '#0D9488']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
 
-          {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+        {/* Decorative Animated Blobs */}
+        <Animated.View style={[styles.blob1, getBlobStyle(blob1, 60, 80, 1.2)]}>
+          <LinearGradient colors={['rgba(94, 234, 212, 0.35)', 'rgba(15, 118, 110, 0.05)']} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+        <Animated.View style={[styles.blob2, getBlobStyle(blob2, 80, -60, 1.15)]}>
+          <LinearGradient colors={['rgba(20, 184, 166, 0.3)', 'rgba(4, 47, 46, 0.0)']} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+        <Animated.View style={[styles.blob3, getBlobStyle(blob3, -120, -100, 1.25)]}>
+          <LinearGradient colors={['rgba(45, 212, 191, 0.25)', 'rgba(13, 148, 136, 0.1)']} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+        <Animated.View style={[styles.blob4, getBlobStyle(blob4, 100, 120, 1.1)]}>
+          <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.0)']} style={StyleSheet.absoluteFill} />
+        </Animated.View>
 
-          <View style={styles.roleContainer}>
-            <TouchableOpacity style={[styles.roleBtn, role === 'consumer' && styles.roleActive]} onPress={() => setRole('consumer')}>
-              <Text style={[styles.roleText, role === 'consumer' && styles.roleTextActive]}>Consumer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.roleBtn, role === 'donor' && styles.roleActive]} onPress={() => setRole('donor')}>
-              <Text style={[styles.roleText, role === 'donor' && styles.roleTextActive]}>Kitchen</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.roleBtn, role === 'shelter' && styles.roleActive]} onPress={() => setRole('shelter')}>
-              <Text style={[styles.roleText, role === 'shelter' && styles.roleTextActive]}>Shelter</Text>
-            </TouchableOpacity>
-          </View>
+        <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={styles.keyboardView}
+            behavior="padding"
+          >
+            <ScrollView
+              style={{ flex: 1, width: '100%' }}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Animated.View
+                style={[
+                  styles.cardWrapper,
+                  {
+                    opacity: fadeAnim,
+                    transform: [
+                      { perspective: 1000 },
+                      { translateY: slideAnim },
+                      { scale: cardScale },
+                      {
+                        rotateX: cardRotateX.interpolate({
+                          inputRange: [-20, 0],
+                          outputRange: ['-20deg', '0deg']
+                        })
+                      }
+                    ]
+                  }
+                ]}
+              >
+                <View style={styles.card}>
 
-          <View style={styles.inputContainer}>
-            <Controller
-              control={control}
-              name="business_name"
-              render={({ field: { onChange, onBlur, value } }) => {
-                const placeholderText = role === 'consumer' ? 'Full Name' : role === 'donor' ? 'Business Name' : 'Organization Name';
-                return (
-                  <>
-                    <TextInput style={[styles.input, errors.business_name && styles.inputError]} placeholder={placeholderText} onBlur={onBlur} onChangeText={onChange} value={value} />
-                    {errors.business_name && <Text style={styles.validationError}>{errors.business_name.message}</Text>}
-                  </>
-                );
-              }}
-            />
+                  <Animated.View style={{ opacity: staggerAnims[0], transform: [{ translateY: staggerAnims[0].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    <View style={styles.headerContainer}>
+                      <Animated.View style={[
+                        styles.iconContainer,
+                        {
+                          transform: [
+                            { scale: logoScale },
+                            { translateY: logoFloat.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }
+                          ]
+                        }
+                      ]}>
+                        <LinearGradient
+                          colors={['rgba(255, 255, 255, 0.9)', 'rgba(204, 251, 241, 0.4)']}
+                          style={StyleSheet.absoluteFill}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                        />
+                        <View style={styles.iconInnerHighlight} />
+                        <Ionicons name="leaf" size={34} color="#0D9488" style={{
+                          shadowColor: '#0D9488',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 6,
+                          elevation: 4
+                        }} />
+                      </Animated.View>
+                      <Text style={styles.title}>Create Account</Text>
+                      <Text style={styles.subtitle}>Join Hyper-Local Food Excess Exchange</Text>
+                    </View>
+                  </Animated.View>
 
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <>
-                  <TextInput style={[styles.input, errors.email && styles.inputError]} placeholder="Email Address" onBlur={onBlur} onChangeText={onChange} value={value} autoCapitalize="none" />
-                  {errors.email && <Text style={styles.validationError}>{errors.email.message}</Text>}
-                </>
-              )}
-            />
+                  {errorMsg ? (
+                    <View>
+                      <Text style={styles.errorText}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
 
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <>
-                  <View style={[styles.passwordContainer, errors.password && styles.inputError]}>
-                    <TextInput style={styles.passwordInput} placeholder="Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showPassword} />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Ionicons name={showPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
-                    </TouchableOpacity>
-                  </View>
-                  {errors.password && <Text style={styles.validationError}>{errors.password.message}</Text>}
-                </>
-              )}
-            />
+                  <Animated.View style={{ opacity: staggerAnims[1], transform: [{ translateY: staggerAnims[1].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    {/* Premium Segmented Control with Icons */}
+                    <View 
+                      style={styles.roleContainer}
+                      onLayout={(e) => setSegmentWidth((e.nativeEvent.layout.width - 12) / 3)}
+                    >
+                      {segmentWidth > 0 && (
+                        <Animated.View style={[
+                          styles.roleActiveIndicator, 
+                          { width: segmentWidth, transform: [{ translateX: indicatorAnim }] }
+                        ]} />
+                      )}
+                      
+                      {ROLES.map((r) => {
+                        const isActive = role === r.id;
+                        return (
+                          <TouchableOpacity
+                            key={r.id}
+                            style={styles.roleBtn}
+                            onPress={() => {
+                              if (!isActive) {
+                                Haptics.selectionAsync();
+                                setRole(r.id);
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                              <Ionicons 
+                                name={isActive ? r.icon : `${r.icon}-outline` as any} 
+                                size={16} 
+                                color={isActive ? '#0D9488' : '#6B7280'} 
+                                style={{ marginRight: 6 }}
+                              />
+                              <Text style={[styles.roleText, isActive && styles.roleTextActive]}>
+                                {r.label}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </Animated.View>
 
-            <Controller
-              control={control}
-              name="confirmPassword"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <>
-                  <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
-                    <TextInput style={styles.passwordInput} placeholder="Confirm Password" onBlur={onBlur} onChangeText={onChange} value={value} secureTextEntry={!showConfirmPassword} />
-                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                      <Ionicons name={showConfirmPassword ? "eye-off" : "eye"} size={24} color="#64748b" />
-                    </TouchableOpacity>
-                  </View>
-                  {errors.confirmPassword && <Text style={styles.validationError}>{errors.confirmPassword.message}</Text>}
-                </>
-              )}
-            />
-          </View>
+                  <Animated.View style={{ opacity: staggerAnims[2], transform: [{ translateY: staggerAnims[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    <InputField
+                      key="email"
+                      control={control}
+                      name="email"
+                      errors={errors}
+                      placeholder="Email Address"
+                      leftIconName="mail-outline"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      textContentType="emailAddress"
+                    />
 
-          <TouchableOpacity style={styles.button} onPress={handleSubmit(onSubmit)} disabled={isLoading}>
-            {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
-          </TouchableOpacity>
+                    <InputField
+                      key="password"
+                      control={control}
+                      name="password"
+                      errors={errors}
+                      placeholder="Password"
+                      leftIconName="lock-closed-outline"
+                      isPassword={true}
+                      textContentType="password"
+                    />
 
-          <TouchableOpacity style={styles.linkButton} onPress={() => router.back()}>
-            <Text style={styles.linkText}>Already have an account? Log in</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+                    <InputField
+                      key="confirmPassword"
+                      control={control}
+                      name="confirmPassword"
+                      errors={errors}
+                      placeholder="Confirm Password"
+                      leftIconName="shield-checkmark-outline"
+                      isPassword={true}
+                      textContentType="password"
+                    />
+                  </Animated.View>
+
+                  <Animated.View style={{ opacity: staggerAnims[3], transform: [{ translateY: staggerAnims[3].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    <View style={{ marginTop: 12, position: 'relative' }}>
+                      <Animated.View style={{
+                        position: 'absolute',
+                        top: 4, left: 12, right: 12, bottom: -4,
+                        backgroundColor: '#FF6B6B',
+                        borderRadius: 24,
+                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.6] }),
+                        transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.05] }) }],
+                      }} />
+
+                      <Animated.View style={{ transform: [{ scale: btnScaleAnim }] }}>
+                        <TouchableOpacity
+                          style={styles.buttonContainer}
+                          onPress={handleSubmit(onSubmit)}
+                          onPressIn={() => {
+                            Animated.parallel([
+                              Animated.spring(btnScaleAnim, { toValue: 0.94, friction: 5, tension: 80, useNativeDriver: true }),
+                              Animated.spring(arrowTranslateX, { toValue: 6, friction: 5, tension: 80, useNativeDriver: true })
+                            ]).start();
+                          }}
+                          onPressOut={() => {
+                            Animated.parallel([
+                              Animated.spring(btnScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
+                              Animated.spring(arrowTranslateX, { toValue: 0, friction: 3, tension: 40, useNativeDriver: true })
+                            ]).start();
+                          }}
+                          disabled={isLoading}
+                          activeOpacity={0.9}
+                        >
+                          <LinearGradient
+                            colors={['#FF8A8A', '#FA5252', '#E03131']}
+                            locations={[0, 0.5, 1]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 0, y: 1 }}
+                            style={styles.buttonGradient}
+                          >
+                            <View style={styles.buttonInnerEdge} />
+
+                            {isLoading ? (
+                              <ActivityIndicator color="#fff" />
+                            ) : (
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={styles.buttonText}>Sign Up</Text>
+                                <Animated.View style={{ transform: [{ translateX: arrowTranslateX }] }}>
+                                  <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 6, marginTop: 2 }} />
+                                </Animated.View>
+                              </View>
+                            )}
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    </View>
+                  </Animated.View>
+
+                  <Animated.View style={{ opacity: staggerAnims[4], transform: [{ translateY: staggerAnims[4].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    <View style={styles.footerContainer}>
+                      <TouchableOpacity onPress={() => router.back()} activeOpacity={0.6}>
+                        <Text style={styles.footerText}>
+                          Already have an account? <Text style={styles.footerLink}>Log in</Text>
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </Animated.View>
+
+                </View>
+              </Animated.View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, backgroundColor: '#f8fafc', padding: 24, justifyContent: 'center' },
-  title: { fontSize: 32, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
-  errorText: { color: '#ef4444', marginBottom: 16, textAlign: 'center', fontWeight: 'bold' },
-  validationError: { color: '#ef4444', fontSize: 12, marginBottom: 8, marginTop: -12, marginLeft: 4 },
-  roleContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24, backgroundColor: '#e2e8f0', padding: 4, borderRadius: 12 },
-  roleBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 10 },
-  roleActive: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  roleText: { color: '#64748b', fontWeight: '600' },
-  roleTextActive: { color: '#0f172a' },
-  inputContainer: { marginBottom: 24 },
-  input: { backgroundColor: '#ffffff', padding: 16, borderRadius: 12, marginBottom: 16, fontSize: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
-  passwordInput: { flex: 1, padding: 16, fontSize: 16 },
-  eyeIcon: { padding: 16 },
-  inputError: { borderColor: '#ef4444' },
-  button: { backgroundColor: '#3b82f6', padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 16 },
-  buttonText: { color: '#ffffff', fontSize: 18, fontWeight: 'bold' },
-  linkButton: { alignItems: 'center' },
-  linkText: { color: '#64748b', fontSize: 14, fontWeight: '600' }
+  container: {
+    flex: 1,
+    backgroundColor: '#0D9488',
+  },
+  blob1: {
+    position: 'absolute',
+    top: -80,
+    right: -80,
+    width: 380,
+    height: 350,
+    borderTopLeftRadius: 200,
+    borderTopRightRadius: 150,
+    borderBottomRightRadius: 220,
+    borderBottomLeftRadius: 180,
+    overflow: 'hidden',
+  },
+  blob2: {
+    position: 'absolute',
+    bottom: -100,
+    left: -100,
+    width: 350,
+    height: 380,
+    borderTopLeftRadius: 160,
+    borderTopRightRadius: 210,
+    borderBottomRightRadius: 175,
+    borderBottomLeftRadius: 190,
+    overflow: 'hidden',
+  },
+  blob3: {
+    position: 'absolute',
+    top: '40%',
+    right: -150,
+    width: 300,
+    height: 280,
+    borderTopLeftRadius: 140,
+    borderTopRightRadius: 160,
+    borderBottomRightRadius: 120,
+    borderBottomLeftRadius: 170,
+    overflow: 'hidden',
+  },
+  blob4: {
+    position: 'absolute',
+    top: '15%',
+    left: -120,
+    width: 250,
+    height: 250,
+    borderTopLeftRadius: 140,
+    borderTopRightRadius: 100,
+    borderBottomRightRadius: 150,
+    borderBottomLeftRadius: 110,
+    overflow: 'hidden',
+  },
+  keyboardView: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  cardWrapper: {
+    marginHorizontal: 24,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 15 },
+        shadowOpacity: 0.15,
+        shadowRadius: 30,
+      },
+      android: {
+        borderBottomWidth: 2,
+        borderBottomColor: 'rgba(0, 0, 0, 0.06)',
+        borderRightWidth: 1,
+        borderRightColor: 'rgba(0, 0, 0, 0.04)',
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.5)',
+        borderLeftWidth: 1,
+        borderLeftColor: 'rgba(255, 255, 255, 0.3)',
+      }
+    })
+  },
+  card: {
+    borderRadius: 36,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  iconContainer: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    backgroundColor: '#CCFBF1',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  iconInnerHighlight: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 22,
+    borderTopWidth: 2,
+    borderTopColor: 'rgba(255, 255, 255, 0.9)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 8,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#4B5563',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  errorText: {
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: '600',
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  roleContainer: {
+    flexDirection: 'row',
+    position: 'relative', // for absolute indicator
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    padding: 6,
+    borderRadius: 20, // Modern pill shape
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  roleActiveIndicator: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    left: 6,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0D9488',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(13, 148, 136, 0.1)',
+      }
+    }),
+  },
+  roleBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    zIndex: 1, // ensure text sits above indicator
+  },
+  roleText: {
+    color: '#6B7280',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  roleTextActive: {
+    color: '#0D9488',
+    fontWeight: '700',
+  },
+  buttonContainer: {
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#E03131',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 12,
+  },
+  buttonGradient: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonInnerEdge: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 22,
+    borderTopWidth: 1.5,
+    borderTopColor: 'rgba(255, 255, 255, 0.45)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  footerContainer: {
+    marginTop: 36,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#4B5563',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  footerLink: {
+    color: '#0D9488',
+    fontWeight: '800',
+  },
 });
