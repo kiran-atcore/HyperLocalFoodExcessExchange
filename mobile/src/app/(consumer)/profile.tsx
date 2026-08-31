@@ -101,7 +101,11 @@ export default function ConsumerProfileScreen() {
 
         <View style={styles.profileHeader}>
           <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarInitial}>{profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : 'C'}</Text>
+            {profile?.profile_picture ? (
+              <Image source={{ uri: profile.profile_picture }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitial}>{profile?.first_name ? profile.first_name.charAt(0).toUpperCase() : (profile?.business_name ? profile.business_name.charAt(0).toUpperCase() : 'C')}</Text>
+            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{
@@ -110,10 +114,16 @@ export default function ConsumerProfileScreen() {
                 : (profile?.business_name || profile?.first_name || 'Consumer')
             }</Text>
             <Text style={styles.email}>{profile?.email}</Text>
+            {profile?.phone_number ? (
+              <Text style={styles.phone}>{profile.phone_number}</Text>
+            ) : null}
             <View style={styles.badge}>
               <Text style={styles.badgeText}>Consumer</Text>
             </View>
           </View>
+          <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/(forms)/edit-consumer-profile/me' as any)}>
+            <Ionicons name="create-outline" size={20} color="#64748b" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.statsContainer}>
@@ -151,13 +161,16 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginVertical: 16 },
 
   profileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, marginRight: 16, backgroundColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center' },
+  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, marginRight: 16, backgroundColor: '#cbd5e1', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%' },
   avatarInitial: { fontSize: 36, fontWeight: 'bold', color: '#ffffff' },
   profileInfo: { flex: 1 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 },
-  email: { fontSize: 14, color: '#64748b', marginBottom: 8 },
+  email: { fontSize: 14, color: '#64748b', marginBottom: 4 },
+  phone: { fontSize: 13, color: '#64748b', marginBottom: 8 },
   badge: { backgroundColor: '#e2e8f0', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { fontSize: 12, fontWeight: 'bold', color: '#475569' },
+  editProfileBtn: { padding: 8, borderRadius: 8, backgroundColor: '#f1f5f9', alignSelf: 'flex-start' },
 
   statsContainer: { flexDirection: 'row', backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
   statBox: { flex: 1, alignItems: 'center' },

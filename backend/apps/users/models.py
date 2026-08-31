@@ -32,6 +32,7 @@ class User(AbstractUser):
     address = models.CharField(max_length=255, blank=True)
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     is_approved = models.BooleanField(default=False)
     
     APPROVAL_CHOICES = [

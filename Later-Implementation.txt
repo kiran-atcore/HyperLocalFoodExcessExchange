@@ -1,0 +1,109 @@
+================================================================================
+FREE-TIER IMAGE UPLOAD & STORAGE ARCHITECTURE (LATER IMPLEMENTATION)
+================================================================================
+
+1. OVERVIEW & STRATEGY
+--------------------------------------------------------------------------------
+To prevent running into storage limits or paying for cloud storage on free tiers,
+we combine client-side image downscaling/compression in React Native (Expo) with
+Cloudinary (25 GB free storage & bandwidth) on Django.
+
+Raw phone cameras take 5 MB - 12 MB images. Compressing them on the client before
+upload shrinks them to ~60 KB with zero noticeable loss in quality on mobile.
+
+- At 60 KB/image, a 1 GB free tier holds ~16,000 images.
+- With Cloudinary's 25 GB free tier, you can store ~400,000 images at $0 cost.
+
+
+2. MOBILE APP IMPLEMENTATION (REACT NATIVE / EXPO)
+--------------------------------------------------------------------------------
+A. Dependencies (Native rebuild required):
+   - expo-image-picker: Allows selecting photos from gallery or capturing from camera.
+   - expo-image-manipulator: Compresses and resizes images on the device before uploading.
+
+B. Client-Side Compression Flow:
+   1. User picks/takes photo using `ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 })`.
+   2. Pass image URI to `ImageManipulator.manipulateAsync`:
+      - Resize: `{ resize: { width: 800 } }` (maintains aspect ratio, max width 800px).
+      - Compress: `{ compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }`.
+   3. Result: Compressed image file (~50-70 KB).
+   4. Append to `FormData` and POST to Django API endpoint via multipart/form-data.
+
+C. Example Frontend Utility:
+   ```typescript
+   import * as ImagePicker from 'expo-image-picker';
+   import * as ImageManipulator from 'expo-image-manipulator';
+
+   export const pickAndCompressImage = async (maxWidth = 800, quality = 0.6) => {
+     const result = await ImagePicker.launchImageLibraryAsync({
+       mediaTypes: ['images'],
+       allowsEditing: true,
+       aspect: [4, 3],
+       quality: 1,
+     });
+
+     if (result.canceled || !result.assets[0]) return null;
+
+     const manipulated = await ImageManipulator.manipulateAsync(
+       result.assets[0].uri,
+       [{ resize: { width: maxWidth } }],
+       { compress: quality, format: ImageManipulator.SaveFormat.JPEG }
+     );
+
+     return manipulated.uri;
+   };
+   ```
+
+
+3. BACKEND IMPLEMENTATION (DJANGO + CLOUDINARY)
+--------------------------------------------------------------------------------
+A. Python Dependencies:
+   - `cloudinary`
+   - `django-cloudinary-storage`
+   - `Pillow`
+
+B. Django Configuration (`settings.py`):
+   ```python
+   INSTALLED_APPS = [
+       ...
+       'cloudinary_storage',
+       'django.contrib.staticfiles',
+       'cloudinary',
+       ...
+   ]
+
+   CLOUDINARY_STORAGE = {
+       'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+       'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+       'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+   }
+
+   DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+   MEDIA_URL = '/media/'
+   ```
+
+C. Models Usage:
+   ```python
+   from django.db import models
+
+   class SurplusListing(models.Model):
+       ...
+       image = models.ImageField(upload_to='surplus_images/', null=True, blank=True)
+       ...
+
+   class User(AbstractUser):
+       ...
+       profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
+       ...
+   ```
+   When an image is saved in Django, `django-cloudinary-storage` automatically streams
+   it to Cloudinary's CDN and stores the public secure URL in the database.
+
+
+4. DEPLOYMENT ENVIRONMENT VARIABLES
+--------------------------------------------------------------------------------
+Set these in your hosting environment (e.g., Render, Railway, Fly.io):
+- `CLOUDINARY_CLOUD_NAME=<your_cloud_name>`
+- `CLOUDINARY_API_KEY=<your_api_key>`
+- `CLOUDINARY_API_SECRET=<your_api_secret>`
+================================================================================

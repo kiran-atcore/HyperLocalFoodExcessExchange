@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, DeviceEventEmitter, Image } from 'react-native';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -115,6 +115,12 @@ export default function SurplusDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         
+        {listing.image ? (
+          <View style={styles.imageBannerContainer}>
+            <Image source={{ uri: listing.image }} style={styles.imageBanner} resizeMode="cover" />
+          </View>
+        ) : null}
+
         <View style={styles.summaryCard}>
           <Text style={styles.title}>{listing.title}</Text>
           <View style={styles.badge}>
@@ -277,7 +283,22 @@ const styles = StyleSheet.create({
   placeholder: { width: 32 },
   
   content: { padding: 16, paddingBottom: 40 },
-  
+  imageBannerContainer: {
+    height: 200,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#e2e8f0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  imageBanner: {
+    width: '100%',
+    height: '100%',
+  },
   summaryCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#1e293b', marginBottom: 12, textAlign: 'center' },
   badge: { backgroundColor: '#dcfce7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },

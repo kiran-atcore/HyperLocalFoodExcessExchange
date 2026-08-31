@@ -1,0 +1,230 @@
+================================================================================
+STYLING, ANIMATIONS & SYSTEM LIBRARIES INTEGRATION GUIDE
+HyperLocal Food Excess Exchange Mobile Application
+================================================================================
+
+This document outlines the exact purpose, high-impact screen applications, code patterns, 
+and aesthetic guidelines for each library to maximize UI/UX polish across Consumer, Donor, 
+and Shelter role interfaces.
+
+--------------------------------------------------------------------------------
+1. UI STYLING, GRADIENTS & VISUAL POLISH
+--------------------------------------------------------------------------------
+
+1.1 expo-linear-gradient
+------------------------
+• Purpose: Vibrant, modern gradients for high-priority CTA buttons, card headers, role badges, and hero cards.
+• Applications & Screen Locations:
+  - Hero Dashboard Cards: Green-to-emerald gradient (`['#10b981', '#059669']`) for "Total Food Saved" & "Impact Stats" in `(donor)/index.tsx`, `(shelter)/index.tsx`, and `(consumer)/profile.tsx`.
+  - Expiration Urgency Banners: Sunset orange-to-red gradient (`['#f59e0b', '#ef4444']`) for items expiring in < 1 hour in `(views)/surplus/[id].tsx` and `(consumer)/index.tsx`.
+  - Primary Action Buttons: Smooth blue-to-indigo gradient (`['#3b82f6', '#2563eb']`) for "Publish Surplus", "Claim for NGO", and "Buy Now".
+• Code Pattern:
+  ```tsx
+  import { LinearGradient } from 'expo-linear-gradient';
+
+  <LinearGradient
+    colors={['#10b981', '#059669']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.impactCard}
+  >
+    <Text style={styles.impactTitle}>Food Rescued: 120 kg</Text>
+  </LinearGradient>
+  ```
+
+1.2 expo-blur
+-------------
+• Purpose: Frosted glassmorphism overlays for headers, modals, floating tab bars, and map preview cards.
+• Applications & Screen Locations:
+  - Floating Map Cards: Translucent background overlay for map floating card details in `(consumer)/map.tsx` and `(shelter)/map.tsx`.
+  - Custom Alert Dialogs / Confirmation Sheets: Frosted glass backdrop blur (`intensity={50}` or `tint="light"`) when confirming claims or cancellations.
+  - Sticky Top Navigation Headers: Subtle translucent blur behind screen headers on scroll.
+• Code Pattern:
+  ```tsx
+  import { BlurView } from 'expo-blur';
+
+  <BlurView intensity={60} tint="light" style={styles.floatingMapOverlay}>
+    <Text style={styles.cardTitle}>Nearby Surplus</Text>
+  </BlurView>
+  ```
+
+1.3 expo-haptics
+----------------
+• Purpose: Tactile vibration micro-feedback giving users physical confirmation for critical actions.
+• Applications & Screen Locations:
+  - QR Code Scanned / Generated: `Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)` when donor verifies a pickup receipt in `(donor)/scanner.tsx` or when QR loads in `receipt/[id].tsx`.
+  - Claim / Purchase Action: `Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)` on tapping "Claim Donation" or "Pay & Claim".
+  - Date / Quantity Picker adjustments: `Haptics.selectionAsync()` on changing portions or dates.
+• Code Pattern:
+  ```tsx
+  import * as Haptics from 'expo-haptics';
+
+  const onConfirmClaim = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Proceed with claim
+  };
+  ```
+
+1.4 @shopify/react-native-skia
+------------------------------
+• Purpose: GPU-accelerated 2D graphics rendering for glowing colored drop-shadows, animated gradient borders, and custom progress rings.
+• Applications & Screen Locations:
+  - Glowing Neon Badges: Soft emerald glow around "100% FREE NGO DONATION" cards and badges.
+  - Circular Impact Progress Rings: Smooth SVG/Skia circular animated metrics on `(donor)/tax.tsx` and `(donor)/profile.tsx` showing yearly deduction quota and food recovery milestones.
+
+--------------------------------------------------------------------------------
+2. ANIMATIONS & MICRO-INTERACTIONS
+--------------------------------------------------------------------------------
+
+2.1 lottie-react-native
+-----------------------
+• Purpose: High-framerate vector animations for empty states, success celebrations, and interactive illustrations.
+• Applications & Screen Locations:
+  - Empty State Feeds: "Empty Fridge" / "No Active Surplus" animated illustration when listings feed is empty in `(consumer)/index.tsx`, `(donor)/index.tsx`, and `(shelter)/index.tsx`.
+  - Pickup Verified Screen: Animated green checkmark celebration in `(views)/receipt/[id].tsx` and `(views)/claim/[id].tsx`.
+  - Searching / Loading States: Pulsing radar/location pin animation on `(consumer)/map.tsx` while fetching nearby GPS radius.
+• Code Pattern:
+  ```tsx
+  import LottieView from 'lottie-react-native';
+
+  <LottieView
+    source={require('../../assets/lottie/empty-box.json')}
+    autoPlay
+    loop
+    style={{ width: 180, height: 180 }}
+  />
+  ```
+
+2.2 moti & moti/skeleton
+------------------------
+• Purpose: Declarative layout animations, staggered list entrances, pulsing alert badges, and shimmering skeleton loaders.
+• Applications & Screen Locations:
+  - Staggered Feed Entrances: Food cards gracefully fade-and-slide up one-by-one upon screen load in all list feeds.
+  - Shimmering Skeletons (`moti/skeleton`): Replaces generic spinning activity indicators with card-shaped shimmering placeholders while loading food listings or profile metrics.
+  - Pulsing "Urgent Pickup" Badges: Smooth infinite scale/opacity breathing animation (`animate={{ scale: [1, 1.05, 1] }}`) for listings expiring in < 30 minutes.
+• Code Pattern:
+  ```tsx
+  import { MotiView } from 'moti';
+  import { Skeleton } from 'moti/skeleton';
+
+  // Skeleton Loading
+  <Skeleton colorMode="light" width={'100%'} height={140} radius={16} />
+
+  // Staggered Entrance
+  <MotiView
+    from={{ opacity: 0, translateY: 15 }}
+    animate={{ opacity: 1, translateY: 0 }}
+    transition={{ type: 'timing', duration: 350, delay: index * 60 }}
+  >
+    <FoodCard item={item} />
+  </MotiView>
+  ```
+
+2.3 react-native-confetti-cannon
+--------------------------------
+• Purpose: Full-screen celebratory particle confetti explosion.
+• Applications & Screen Locations:
+  - Successful Pickup Verification: Fires confetti cannon when a shelter coordinator or consumer has their QR code scanned and marked as `PICKED_UP`.
+  - Tax Receipt Export: Fires celebratory particles when a donor crosses a major tax deduction or meals donated milestone in `(donor)/tax.tsx`.
+• Code Pattern:
+  ```tsx
+  import ConfettiCannon from 'react-native-confetti-cannon';
+
+  {isSuccess && (
+    <ConfettiCannon count={120} origin={{ x: -10, y: 0 }} fadeOut autoStart />
+  )}
+  ```
+
+--------------------------------------------------------------------------------
+3. GESTURES, BOTTOM SHEETS & CAROUSELS
+--------------------------------------------------------------------------------
+
+3.1 @gorhom/bottom-sheet
+------------------------
+• Purpose: Smooth 60/120 FPS draggable bottom sheets (like Google Maps & Uber).
+• Applications & Screen Locations:
+  - Map Location Pin Details: Sliding sheet over Leaflet/React Native Map in `(consumer)/map.tsx` and `(shelter)/map.tsx` displaying selected store details, distance, and quick "Claim" action without unmounting the map.
+  - Filter & Sorting Sheet: Interactive draggable filter sheet for dietary preferences (Veg, Halal, Vegan), distance radius slider, and sorting by expiration.
+• Code Pattern:
+  ```tsx
+  import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+
+  <BottomSheet snapPoints={['25%', '50%', '85%']} index={0}>
+    <BottomSheetView style={styles.sheetContent}>
+      <Text style={styles.sheetTitle}>Surplus Details</Text>
+    </BottomSheetView>
+  </BottomSheet>
+  ```
+
+3.2 react-native-reanimated-carousel
+------------------------------------
+• Purpose: Ultra-smooth, performant swipeable carousel for horizontal image galleries.
+• Applications & Screen Locations:
+  - Multi-Photo Food Listings: Swiping between multiple photos of bulk food packages on `(views)/surplus/[id].tsx`.
+  - Onboarding Step Slider: Explaining "How It Works: 1. Find Surplus -> 2. Claim -> 3. Show QR -> 4. Rescue Food".
+• Code Pattern:
+  ```tsx
+  import Carousel from 'react-native-reanimated-carousel';
+
+  <Carousel
+    width={screenWidth - 32}
+    height={200}
+    data={images}
+    renderItem={({ item }) => <Image source={{ uri: item }} style={styles.carouselImg} />}
+  />
+  ```
+
+--------------------------------------------------------------------------------
+4. FEEDBACK & FLOATING NOTIFICATIONS
+--------------------------------------------------------------------------------
+
+4.1 react-native-toast-message
+------------------------------
+• Purpose: Elegant animated floating top/bottom toast banners that replace intrusive native system modal alerts.
+• Applications & Screen Locations:
+  - "Saved to Gallery": Quick green floating badge when saving QR receipt to photo album in `(views)/receipt/[id].tsx`.
+  - "Listing Published": Smooth toast alert upon publishing excess food in `(forms)/post-surplus/[id].tsx`.
+  - "Claim Approved / Picked Up": Floating banner showing live status updates.
+• Code Pattern:
+  ```tsx
+  import Toast from 'react-native-toast-message';
+
+  Toast.show({
+    type: 'success',
+    text1: 'QR Code Saved',
+    text2: 'Receipt has been downloaded to your gallery!',
+    position: 'top',
+    visibilityTime: 3000,
+  });
+  ```
+
+--------------------------------------------------------------------------------
+5. HARDWARE, PRINT & SYSTEM ENGAGEMENT
+--------------------------------------------------------------------------------
+
+5.1 expo-notifications
+----------------------
+• Purpose: Push and local scheduled notifications.
+• Applications:
+  - Instant alerts for Shelters when a nearby restaurant posts free bulk donation (>10 portions).
+  - Expiration reminder 30 minutes before pickup window closes.
+
+5.2 expo-print
+--------------
+• Purpose: Generate clean, printable PDF documents on-device.
+• Applications:
+  - Exporting official Section 80G / 501(c)(3) tax deduction certificates directly to PDF in `(donor)/tax.tsx`.
+
+5.3 expo-sharing
+----------------
+• Purpose: Native OS share sheet integration.
+• Applications:
+  - Sharing surplus donation links to WhatsApp groups, NGO volunteers, and social channels.
+
+5.4 expo-local-authentication
+-----------------------------
+• Purpose: Biometric Face ID / Fingerprint fast login.
+• Applications:
+  - Instant, one-tap login for verified kitchen managers and shelter coordinators.
+
+================================================================================

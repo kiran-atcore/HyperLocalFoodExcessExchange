@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import api from '../../../utils/api';
+import FoodImagePicker from '../../../components/FoodImagePicker';
 
 export default function EditSurplusScreen() {
   const { id } = useLocalSearchParams();
@@ -18,6 +19,7 @@ export default function EditSurplusScreen() {
   const [quantityUnit, setQuantityUnit] = useState('portions');
   const [dietaryInfo, setDietaryInfo] = useState('None');
   const [additionalDetails, setAdditionalDetails] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const [isDonation, setIsDonation] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,6 +73,7 @@ export default function EditSurplusScreen() {
       setDietaryInfo(data.dietary_info || 'None');
       setAdditionalDetails(data.additional_details || '');
       setIsDonation(data.listing_type === 'DONATION');
+      setImage(data.image || null);
       if (data.pickup_end) {
         const fetchedDate = new Date(data.pickup_end);
         if (fetchedDate.getTime() < new Date().getTime()) {
@@ -140,6 +143,7 @@ export default function EditSurplusScreen() {
         quantity_unit: quantityUnit,
         dietary_info: dietaryInfo,
         additional_details: additionalDetails,
+        image: image,
         pickup_end: pickupEnd.toISOString(),
       };
       await api.patch(`/listings/${id}/`, payload);
@@ -166,6 +170,12 @@ export default function EditSurplusScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          <FoodImagePicker
+            imageUri={image}
+            onImageSelected={(img) => setImage(img)}
+            onImageRemoved={() => setImage(null)}
+          />
+
           <Text style={styles.sectionTitle}>Details</Text>
           <View style={styles.card}>
             <View style={styles.inputGroup}>

@@ -23,6 +23,7 @@ class FoodListing(models.Model):
     quantity_unit = models.CharField(max_length=20, default='portions')
     dietary_info = models.CharField(max_length=50, default='None')
     additional_details = models.TextField(blank=True, null=True)
+    image = models.ImageField(upload_to='surplus_images/', null=True, blank=True)
     
     # Geolocation standard float fields for pure SQLite support
     latitude = models.FloatField()

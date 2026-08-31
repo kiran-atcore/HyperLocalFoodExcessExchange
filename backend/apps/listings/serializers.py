@@ -1,7 +1,26 @@
+import base64
+import uuid
+from django.core.files.base import ContentFile
 from rest_framework import serializers
 from .models import FoodListing
 
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        if data == "" or data is None:
+            return None
+        if isinstance(data, str) and data.startswith('data:image'):
+            format_str, imgstr = data.split(';base64,')
+            ext = format_str.split('/')[-1]
+            if ext == 'jpeg':
+                ext = 'jpg'
+            file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
+            data = ContentFile(base64.b64decode(imgstr), name=file_name)
+        elif isinstance(data, str) and (data.startswith('http://') or data.startswith('https://') or data.startswith('/media/')):
+            return serializers.SkipField()
+        return super().to_internal_value(data)
+
 class FoodListingSerializer(serializers.ModelSerializer):
+    image = Base64ImageField(required=False, allow_null=True)
     is_claimed = serializers.SerializerMethodField()
     quantity_remaining = serializers.SerializerMethodField()
     donor_status = serializers.SerializerMethodField()

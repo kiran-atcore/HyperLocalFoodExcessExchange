@@ -16,11 +16,13 @@ export const generateMapPinCardHtml = (sortedGroup: any[], distStr: string, safe
         badgeHtml = '<span style="font-size: 10px; background: #dcfce7; color: #065f46; padding: 2px 6px; border-radius: 4px; margin-bottom: 4px; display: inline-block;">Discounted Surplus</span>';
       }
       
-      const buttonText = item.is_claimed ? 'Already Claimed' : (isDonation ? 'Claim for NGO' : 'Buy Now');
+      const isClaimed = item.is_claimed || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
+      const buttonText = isClaimed ? 'Already Claimed' : (isDonation ? 'Claim for NGO' : 'Buy Now');
       const displayPrice = isDonation ? 'FREE' : (item.discounted_price ? `₹${Number(item.discounted_price).toFixed(2)}` : 'FREE');
       
-      const qtyCount = item.quantity_available !== undefined ? item.quantity_available : (item.quantity_remaining !== undefined ? item.quantity_remaining : '');
-      const qtyStr = qtyCount !== '' ? `<small style="color: #64748b;">Qty: ${qtyCount} ${item.quantity_unit || 'portions'}</small><br/>` : '';
+      const qtyCount = item.quantity_remaining !== undefined ? item.quantity_remaining : (item.quantity_available !== undefined ? item.quantity_available : '');
+      const qtyStr = qtyCount !== '' ? `<small style="color: #64748b;">Qty: ${qtyCount} ${item.quantity_unit || 'portions'}${!isDonation ? ' left' : ''}</small><br/>` : '';
+      const imageHtml = item.image ? `<img src="${item.image}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;" />` : '';
 
       itemsHtml += `
         <div id="item_container_${item.id}" style="border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; overflow: hidden; text-align: left;">
@@ -29,6 +31,7 @@ export const generateMapPinCardHtml = (sortedGroup: any[], distStr: string, safe
             <span id="icon_${item.id}" style="font-size: 16px; color: #64748b; line-height: 1; min-width: 12px; text-align: center;">${isExpanded ? '−' : '+'}</span>
           </div>
           <div class="group_${groupId}" id="content_${item.id}" style="padding: 10px; display: ${isExpanded ? 'block' : 'none'}; text-align: center; border-top: 1px solid #e2e8f0;">
+            ${imageHtml}
             <div onclick="handleCardClick(${item.id})" style="color: #3b82f6; text-decoration: underline; font-size: 13px; margin-bottom: 8px; cursor: pointer;">View Details</div>
             ${badgeHtml}<br/>
             <span style="color: ${color}; font-weight: bold; font-size: 14px;">${displayPrice}</span><br/>

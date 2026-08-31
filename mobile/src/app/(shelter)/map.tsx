@@ -56,7 +56,7 @@ export default function ShelterMapScreen() {
     try {
       const response = await api.get('/listings/');
       const now = new Date().getTime();
-      const activeDonations = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      const activeDonations = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed && (item.quantity_remaining === undefined || item.quantity_remaining > 0));
       setDonations(activeDonations);
       setFilteredDonations(activeDonations);
     } catch (e) {

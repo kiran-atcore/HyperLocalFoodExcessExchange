@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import api from '../../../utils/api';
 import CountdownTimer from '../../../components/CountdownTimer';
 
@@ -84,7 +84,7 @@ export default function ClaimDetailScreen() {
   const saveQRCode = async () => {
     if (!qrRef.current) return;
     
-    const { status } = await MediaLibrary.requestPermissionsAsync();
+    const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
     if (status !== 'granted') {
       Alert.alert("Permission Required", "We need permission to save images to your gallery.");
       return;

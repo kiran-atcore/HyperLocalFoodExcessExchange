@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import api from '../../../utils/api';
+import FoodImagePicker from '../../../components/FoodImagePicker';
 
 export default function PostSurplusScreen() {
   const { id } = useLocalSearchParams();
@@ -16,6 +17,7 @@ export default function PostSurplusScreen() {
   const [quantityUnit, setQuantityUnit] = useState('portions');
   const [dietaryInfo, setDietaryInfo] = useState('None');
   const [additionalDetails, setAdditionalDetails] = useState('');
+  const [image, setImage] = useState<string | null>(null);
   const [isDonation, setIsDonation] = useState(false);
   const [isCertified, setIsCertified] = useState(false);
   const [userLat, setUserLat] = useState<number | null>(null);
@@ -109,6 +111,7 @@ export default function PostSurplusScreen() {
         quantity_unit: quantityUnit,
         dietary_info: dietaryInfo,
         additional_details: additionalDetails,
+        image: image,
         latitude: userLat || 8.5241, // Fallback if kitchen profile has no location
         longitude: userLng || 76.9366,
         pickup_address: userAddress || "Kitchen Location",
@@ -141,6 +144,12 @@ export default function PostSurplusScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          <FoodImagePicker
+            imageUri={image}
+            onImageSelected={(img) => setImage(img)}
+            onImageRemoved={() => setImage(null)}
+          />
+
           <View style={styles.donationToggleCard}>
             <View style={styles.toggleTextCol}>
               <Text style={styles.toggleTitle}>Bulk NGO Donation</Text>

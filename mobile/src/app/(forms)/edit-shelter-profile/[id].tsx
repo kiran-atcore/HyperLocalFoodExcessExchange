@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../../utils/api';
 import LocationBanner from '../../../components/LocationBanner';
+import ProfileImagePicker from '../../../components/ProfileImagePicker';
 import * as Location from 'expo-location';
-
 import { AuthContext } from '../../../context/AuthContext';
 
 export default function EditShelterProfileScreen() {
@@ -19,6 +19,7 @@ export default function EditShelterProfileScreen() {
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('');
@@ -58,7 +59,7 @@ export default function EditShelterProfileScreen() {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setAddress(''); // reset if denied
+        setAddress('');
         return; 
       }
       let location;
@@ -74,7 +75,6 @@ export default function EditShelterProfileScreen() {
       }
       
       const { latitude, longitude } = location.coords;
-      
       let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
       
       if (hasManualLocation.current) return;
@@ -105,6 +105,7 @@ export default function EditShelterProfileScreen() {
       setAddress(data.address || '');
       setLat(data.latitude || null);
       setLng(data.longitude || null);
+      setProfilePicture(data.profile_picture || null);
     } catch (e) {
       Alert.alert("Error", "Could not load profile");
       router.back();
@@ -114,7 +115,6 @@ export default function EditShelterProfileScreen() {
   };
 
   const handleUpdate = async () => {
-    // Validate phone number (Indian standard: optional +91/91/0 followed by 10 digits starting with 6-9)
     const phoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/;
     const cleanPhone = phoneNumber.replace(/\s+/g, '');
 
@@ -147,6 +147,7 @@ export default function EditShelterProfileScreen() {
           address: address,
           latitude: lat,
           longitude: lng,
+          profile_picture: profilePicture,
         });
 
         const loginRes = await api.post('/users/login/', {
@@ -154,7 +155,7 @@ export default function EditShelterProfileScreen() {
           password: regPassword || (params.password as string),
         });
         await login(loginRes.data.access, loginRes.data.refresh);
-        Alert.alert("Request Sent", "Your organization is pending admin approval.");
+        Alert.alert("Request Sent", "Your account is pending admin approval.");
         router.replace('/');
       } else {
         const payload = {
@@ -164,9 +165,10 @@ export default function EditShelterProfileScreen() {
           address: address,
           latitude: lat,
           longitude: lng,
+          profile_picture: profilePicture,
         };
         await api.patch('/users/me/', payload);
-        Alert.alert("Updated", "Your organization profile has been updated.");
+        Alert.alert("Updated", "Your profile has been updated.");
         router.back();
       }
     } catch (e: any) {
@@ -192,7 +194,7 @@ export default function EditShelterProfileScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Organization Profile</Text>
+          <Text style={styles.headerTitle}>{id === 'new' ? 'Shelter Setup' : 'Edit Profile'}</Text>
           <View style={styles.placeholder} />
         </View>
         <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
@@ -207,20 +209,28 @@ export default function EditShelterProfileScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Organization Profile</Text>
+          <Text style={styles.headerTitle}>{id === 'new' ? 'Shelter Setup' : 'Edit Profile'}</Text>
           <View style={styles.placeholder} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          <ProfileImagePicker
+            imageUri={profilePicture}
+            defaultInitial={businessName ? businessName.charAt(0) : 'S'}
+            defaultIcon="business"
+            onImageSelected={(img) => setProfilePicture(img)}
+            onImageRemoved={() => setProfilePicture(null)}
+          />
+
           <Text style={styles.sectionTitle}>Organization Details</Text>
           <View style={styles.card}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Organization Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Hope Shelter" value={businessName} onChangeText={setBusinessName} />
+              <Text style={styles.label}>Shelter / NGO Name</Text>
+              <TextInput style={styles.input} placeholder="e.g. Hope Shelter Organization" value={businessName} onChangeText={setBusinessName} />
             </View>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Manager Name (Internal)</Text>
+              <Text style={styles.label}>Coordinator / Representative Name</Text>
               <TextInput style={styles.input} placeholder="e.g. Jane Doe" value={name} onChangeText={setName} />
             </View>
             <View style={[styles.inputGroup, { marginBottom: 0 }]}>
@@ -229,7 +239,7 @@ export default function EditShelterProfileScreen() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Default Location</Text>
+          <Text style={styles.sectionTitle}>Location Details</Text>
           <View style={styles.card}>
             <LocationBanner 
               address={address} 

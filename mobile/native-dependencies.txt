@@ -1,3 +1,4 @@
 # List of native dependencies to bundle before a single build
 
-# (All dependencies have been installed and integrated)
+# All pending native dependencies have been installed into package.json.
+# Build Profile Constraint: When building the application (e.g. EAS Build), always use `--profile development`.

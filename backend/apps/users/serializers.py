@@ -5,17 +5,41 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
+import base64
+import uuid
+from django.core.files.base import ContentFile
+
+class Base64ImageField(serializers.ImageField):
+    def to_internal_value(self, data):
+        if data == "" or data is None:
+            return None
+        if isinstance(data, str) and data.startswith('data:image'):
+            # Format: data:image/png;base64,...
+            format_str, imgstr = data.split(';base64,')
+            ext = format_str.split('/')[-1]
+            if ext == 'jpeg':
+                ext = 'jpg'
+            file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
+            data = ContentFile(base64.b64decode(imgstr), name=file_name)
+        elif isinstance(data, str) and (data.startswith('http://') or data.startswith('https://') or data.startswith('/media/')):
+            # Existing image URL passed back, don't re-save or clear
+            return serializers.SkipField()
+        return super().to_internal_value(data)
+
 class UserSerializer(serializers.ModelSerializer):
+    profile_picture = Base64ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
-        fields = ['id', 'email', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason', 'first_name', 'last_name']
+        fields = ['id', 'email', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'profile_picture', 'is_approved', 'approval_status', 'rejection_count', 'rejection_reason', 'first_name', 'last_name']
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    profile_picture = Base64ImageField(required=False, allow_null=True)
     
     class Meta:
         model = User
-        fields = ['email', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'first_name', 'last_name']
+        fields = ['email', 'password', 'role', 'business_name', 'phone_number', 'address', 'latitude', 'longitude', 'profile_picture', 'first_name', 'last_name']
         
     def create(self, validated_data):
         role = validated_data.get('role', 'consumer')
@@ -31,6 +55,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             address=validated_data.get('address', ''),
             latitude=validated_data.get('latitude', None),
             longitude=validated_data.get('longitude', None),
+            profile_picture=validated_data.get('profile_picture', None),
             first_name=validated_data.get('first_name', ''),
             last_name=validated_data.get('last_name', ''),
             is_approved=is_approved,

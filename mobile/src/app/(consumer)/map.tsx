@@ -59,7 +59,7 @@ export default function ConsumerMapScreen() {
 
       const response = await api.get('/listings/?listing_type=DISCOUNT');
       const now = new Date().getTime();
-      const activeDeals = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed);
+      const activeDeals = response.data.filter((item: any) => new Date(item.pickup_end).getTime() > now && !item.is_claimed && (item.quantity_remaining === undefined || item.quantity_remaining > 0));
       setDeals(activeDeals);
       setFilteredDeals(activeDeals);
     } catch (e) {

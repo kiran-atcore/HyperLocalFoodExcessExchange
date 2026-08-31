@@ -1,5 +1,5 @@
 import React, { useContext, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../../context/AuthContext';
@@ -79,7 +79,11 @@ export default function ShelterProfileScreen() {
 
         <View style={styles.profileHeader}>
           <View style={styles.avatarPlaceholder}>
-            <Ionicons name="business" size={40} color="#3b82f6" />
+            {profile?.profile_picture ? (
+              <Image source={{ uri: profile.profile_picture }} style={styles.avatarImage} />
+            ) : (
+              <Ionicons name="business" size={40} color="#3b82f6" />
+            )}
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.name}>{profile?.business_name || profile?.first_name || 'Loading...'}</Text>
@@ -159,7 +163,8 @@ const styles = StyleSheet.create({
   
   profileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, position: 'relative' },
   editProfileBtn: { position: 'absolute', top: 12, right: 12, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 20, zIndex: 10, elevation: 3 },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', marginRight: 16, alignItems: 'center', justifyContent: 'center' },
+  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', marginRight: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%' },
   profileInfo: { flex: 1 },
   name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
   ownerName: { fontSize: 13, color: '#475569', fontWeight: '500', marginBottom: 4 },

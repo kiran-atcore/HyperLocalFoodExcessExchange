@@ -5,9 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import api from '../../../utils/api';
 import LocationBanner from '../../../components/LocationBanner';
-
+import ProfileImagePicker from '../../../components/ProfileImagePicker';
 import * as Location from 'expo-location';
-
 import { AuthContext } from '../../../context/AuthContext';
 
 export default function EditKitchenProfileScreen() {
@@ -20,6 +19,7 @@ export default function EditKitchenProfileScreen() {
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('');
@@ -59,7 +59,7 @@ export default function EditKitchenProfileScreen() {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setAddress(''); // reset if denied
+        setAddress('');
         return; 
       }
       let location;
@@ -75,7 +75,6 @@ export default function EditKitchenProfileScreen() {
       }
       
       const { latitude, longitude } = location.coords;
-      
       let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
       
       if (hasManualLocation.current) return;
@@ -106,6 +105,7 @@ export default function EditKitchenProfileScreen() {
       setAddress(data.address || '');
       setLat(data.latitude || null);
       setLng(data.longitude || null);
+      setProfilePicture(data.profile_picture || null);
     } catch (e) {
       Alert.alert("Error", "Could not load profile");
       router.back();
@@ -115,7 +115,6 @@ export default function EditKitchenProfileScreen() {
   };
 
   const handleUpdate = async () => {
-    // Validate phone number (Indian standard: optional +91/91/0 followed by 10 digits starting with 6-9)
     const phoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/;
     const cleanPhone = phoneNumber.replace(/\s+/g, '');
 
@@ -148,6 +147,7 @@ export default function EditKitchenProfileScreen() {
           address: address,
           latitude: lat,
           longitude: lng,
+          profile_picture: profilePicture,
         });
 
         const loginRes = await api.post('/users/login/', {
@@ -165,6 +165,7 @@ export default function EditKitchenProfileScreen() {
           address: address,
           latitude: lat,
           longitude: lng,
+          profile_picture: profilePicture,
         };
         await api.patch('/users/me/', payload);
         Alert.alert("Updated", "Your profile has been updated.");
@@ -180,9 +181,9 @@ export default function EditKitchenProfileScreen() {
 
   const openMap = () => {
     if (lat && lng) {
-      router.push(`/(views)/map/location?lat=${lat}&lng=${lng}`);
+      router.push(`/(views)/map/location?lat=${lat}&lng=${lng}` as any);
     } else {
-      router.push('/(views)/map/location');
+      router.push('/(views)/map/location' as any);
     }
   };
 
@@ -193,7 +194,7 @@ export default function EditKitchenProfileScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerTitle}>{id === 'new' ? 'Kitchen Setup' : 'Edit Profile'}</Text>
           <View style={styles.placeholder} />
         </View>
         <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
@@ -208,17 +209,25 @@ export default function EditKitchenProfileScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#0f172a" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Profile</Text>
+          <Text style={styles.headerTitle}>{id === 'new' ? 'Kitchen Setup' : 'Edit Profile'}</Text>
           <View style={styles.placeholder} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           
+          <ProfileImagePicker
+            imageUri={profilePicture}
+            defaultInitial={businessName ? businessName.charAt(0) : 'K'}
+            defaultIcon="storefront"
+            onImageSelected={(img) => setProfilePicture(img)}
+            onImageRemoved={() => setProfilePicture(null)}
+          />
+
           <Text style={styles.sectionTitle}>Business Details</Text>
           <View style={styles.card}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Business Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Hope Shelter / Mario's Pizza" value={businessName} onChangeText={setBusinessName} />
+              <TextInput style={styles.input} placeholder="e.g. Hope Kitchen / Mario's Pizza" value={businessName} onChangeText={setBusinessName} />
             </View>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Owner/Manager Name (Internal)</Text>
@@ -271,11 +280,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 6 },
   input: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, fontSize: 15, color: '#0f172a', borderWidth: 1, borderColor: '#e2e8f0' },
   
-  locationBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#eff6ff', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#bfdbfe' },
-  bannerLeft: { flexDirection: 'row', alignItems: 'center' },
-  bannerTitle: { fontSize: 15, fontWeight: 'bold', color: '#1e40af', marginBottom: 2 },
-  bannerSubtext: { fontSize: 13, color: '#3b82f6' },
-
   publishBtn: { flexDirection: 'row', backgroundColor: '#3b82f6', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   publishBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
 });

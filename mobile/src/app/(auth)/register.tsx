@@ -35,35 +35,20 @@ export default function RegisterScreen() {
     setErrorMsg('');
     setIsLoading(true);
     try {
-      if (role === 'donor' || role === 'shelter') {
-        // Defer registration to the profile setup screen
-        const params = {
-          email: data.email.trim(),
-          password: data.password,
-          business_name: data.business_name,
-          role: role
-        };
+      // Defer registration to the profile setup screen for all roles
+      const params = {
+        email: data.email.trim(),
+        password: data.password,
+        business_name: data.business_name,
+        role: role
+      };
 
-        if (role === 'donor') {
-          router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
-        } else {
-          router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
-        }
+      if (role === 'donor') {
+        router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
+      } else if (role === 'shelter') {
+        router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
       } else {
-        // Consumers can register immediately (no profile setup required)
-        await api.post('/users/register/', {
-          business_name: data.business_name,
-          email: data.email.trim(),
-          password: data.password,
-          role: role
-        });
-
-        const loginRes = await api.post('/users/login/', {
-          email: data.email.trim(),
-          password: data.password,
-        });
-        await login(loginRes.data.access, loginRes.data.refresh);
-        router.replace('/');
+        router.replace({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { ...params, id: 'new' } });
       }
     } catch (err: any) {
       if (err.response?.data?.email) {
