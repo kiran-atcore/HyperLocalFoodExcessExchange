@@ -1,4 +1,4 @@
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions, Animated, ScrollView, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Dimensions, Animated, ScrollView, TouchableWithoutFeedback, Keyboard, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import api from '../../utils/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import InputField from '../../components/InputField';
+import ButtonOne from '../../components/ButtonOne';
 
 const { width } = Dimensions.get('window');
 
@@ -37,11 +38,6 @@ export default function LoginScreen() {
   const blob2 = useRef(new Animated.Value(0)).current;
   const blob3 = useRef(new Animated.Value(0)).current;
   const blob4 = useRef(new Animated.Value(0)).current;
-
-  // Premium Button Animation Values
-  const btnScaleAnim = useRef(new Animated.Value(1)).current;
-  const arrowTranslateX = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
 
   // Logo Animation Values
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -135,14 +131,6 @@ export default function LoginScreen() {
     animateBlob(blob2, 7500);
     animateBlob(blob3, 5000);
     animateBlob(blob4, 8000);
-
-    // Premium Button Pulsing Glow
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 2500, useNativeDriver: true }),
-      ])
-    ).start();
   }, []);
 
   // Helper for generating oscillating transform styles
@@ -289,23 +277,13 @@ export default function LoginScreen() {
                           ]
                         }
                       ]}>
-                        <LinearGradient
-                          colors={['rgba(255, 255, 255, 0.9)', 'rgba(204, 251, 241, 0.4)']} // 3D glassy surface
-                          style={StyleSheet.absoluteFill}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
+                        <Image 
+                          source={require('../../../assets/images/resq-logo.jpg')}
+                          style={{ width: '100%', height: '100%' }}
                         />
-                        <View style={styles.iconInnerHighlight} />
-                        <Ionicons name="leaf" size={34} color="#0D9488" style={{
-                          shadowColor: '#0D9488',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 6,
-                          elevation: 4
-                        }} />
                       </Animated.View>
                       <Text style={styles.title}>Welcome Back</Text>
-                      <Text style={styles.subtitle}>Hyper-Local Food Excess Exchange</Text>
+                      <Text style={styles.subtitle}>Welcome to ResQ</Text>
                     </View>
                   </Animated.View>
 
@@ -339,60 +317,12 @@ export default function LoginScreen() {
                   </Animated.View>
 
                   <Animated.View style={{ opacity: staggerAnims[2], transform: [{ translateY: staggerAnims[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
-                    <View style={{ marginTop: 12, position: 'relative' }}>
-                      {/* Pulsing Aura Glow Behind Button */}
-                      <Animated.View style={{
-                        position: 'absolute',
-                        top: 4, left: 12, right: 12, bottom: -4,
-                        backgroundColor: '#FF6B6B',
-                        borderRadius: 24,
-                        opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.6] }),
-                        transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.05] }) }],
-                      }} />
-
-                      <Animated.View style={{ transform: [{ scale: btnScaleAnim }] }}>
-                        <TouchableOpacity
-                          style={styles.buttonContainer}
-                          onPress={handleSubmit(onSubmit)}
-                          onPressIn={() => {
-                            Animated.parallel([
-                              Animated.spring(btnScaleAnim, { toValue: 0.94, friction: 5, tension: 80, useNativeDriver: true }),
-                              Animated.spring(arrowTranslateX, { toValue: 6, friction: 5, tension: 80, useNativeDriver: true })
-                            ]).start();
-                          }}
-                          onPressOut={() => {
-                            Animated.parallel([
-                              Animated.spring(btnScaleAnim, { toValue: 1, friction: 3, tension: 40, useNativeDriver: true }),
-                              Animated.spring(arrowTranslateX, { toValue: 0, friction: 3, tension: 40, useNativeDriver: true })
-                            ]).start();
-                          }}
-                          disabled={isLoading}
-                          activeOpacity={0.9}
-                        >
-                          <LinearGradient
-                            colors={['#FF8A8A', '#FA5252', '#E03131']}
-                            locations={[0, 0.5, 1]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 0, y: 1 }}
-                            style={styles.buttonGradient}
-                          >
-                            {/* Glossy 3D Inner Edge */}
-                            <View style={styles.buttonInnerEdge} />
-
-                            {isLoading ? (
-                              <ActivityIndicator color="#fff" />
-                            ) : (
-                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Text style={styles.buttonText}>Log In</Text>
-                                <Animated.View style={{ transform: [{ translateX: arrowTranslateX }] }}>
-                                  <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={{ marginLeft: 6, marginTop: 2 }} />
-                                </Animated.View>
-                              </View>
-                            )}
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      </Animated.View>
-                    </View>
+                    <ButtonOne
+                      title="Log In"
+                      onPress={handleSubmit(onSubmit)}
+                      isLoading={isLoading}
+                      showArrow={true}
+                    />
                   </Animated.View>
 
                   <Animated.View style={{ opacity: staggerAnims[3], transform: [{ translateY: staggerAnims[3].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
@@ -547,15 +477,19 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(0, 0, 0, 0.05)',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 8,
-    letterSpacing: -0.5,
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#042F2E',
+    marginBottom: 6,
+    letterSpacing: -0.75,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 16,
+    color: '#64748B',
     textAlign: 'center',
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   errorText: {
     color: '#FA5252',
@@ -623,41 +557,6 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 16,
-  },
-  buttonContainer: {
-    borderRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#E03131',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 12,
-  },
-  buttonGradient: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonInnerEdge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 22,
-    borderTopWidth: 1.5,
-    borderTopColor: 'rgba(255, 255, 255, 0.45)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.15)',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   footerContainer: {
     marginTop: 36,

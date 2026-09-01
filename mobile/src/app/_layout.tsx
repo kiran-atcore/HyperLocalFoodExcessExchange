@@ -6,8 +6,15 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack 
+        screenOptions={{ 
+          headerShown: false,
+          animation: 'fade',
+          contentStyle: { backgroundColor: '#042F2E' } 
+        }}
+      >
         <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
         <Stack.Screen name="(consumer)" />
         <Stack.Screen name="(donor)" />
         <Stack.Screen name="(shelter)" />
