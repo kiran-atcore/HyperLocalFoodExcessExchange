@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import api from '../../utils/api';
 import SurplusCard from '../../components/SurplusCard';
 import { MotiView } from 'moti';
+import AnimatedSearchBar from '../../components/AnimatedSearchBar';
+import AnimatedSegmentControl from '../../components/AnimatedSegmentControl';
 
 const ParticlesBackground = () => {
   // Generate a steady stream of faint, rising particles (like digital embers/fireflies)
@@ -52,7 +54,7 @@ const ParticlesBackground = () => {
   return (
     <View style={StyleSheet.absoluteFill}>
       <LinearGradient
-        colors={['#042F2E', '#d9dfe9ff']}
+        colors={['#042F2E', '#ffffffff']}
         style={StyleSheet.absoluteFill}
       />
       {particles}
@@ -65,9 +67,11 @@ export default function DonorDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'DONATION' | 'DISCOUNT'>('DONATION');
   const [searchQuery, setSearchQuery] = useState('');
+  const [focusKey, setFocusKey] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
+      setFocusKey(prev => prev + 1);
       fetchListings();
     }, [])
   );
@@ -147,8 +151,8 @@ export default function DonorDashboardScreen() {
         {/* Hero Header */}
         <View style={styles.heroHeader}>
           <View>
-            <Text style={styles.heroTitle}>Dashboard</Text>
-            <Text style={styles.heroSubtitle}>Manage your surplus inventory</Text>
+            <Text style={styles.heroTitle}>Surplus Hub</Text>
+            <Text style={styles.heroSubtitle}>Track and manage your active inventory</Text>
           </View>
           <View style={styles.avatarPlaceholder}>
             <Ionicons name="restaurant" size={24} color="#0D9488" />
@@ -157,43 +161,27 @@ export default function DonorDashboardScreen() {
 
         {/* Search & Filter Row */}
         <View style={styles.toolsContainer}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search surplus..."
-              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+          <View style={{ marginBottom: 16 }}>
+            <AnimatedSearchBar
               value={searchQuery}
               onChangeText={setSearchQuery}
+              placeholder="Search surplus..."
+              variant="dark"
             />
           </View>
-
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'DONATION' && styles.activeTab]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setActiveTab('DONATION');
-              }}
-            >
-              <Text style={[styles.tabText, activeTab === 'DONATION' && styles.activeTabText]}>Donations</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'DISCOUNT' && styles.activeTab]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setActiveTab('DISCOUNT');
-              }}
-            >
-              <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.activeTabText]}>Discounted</Text>
-            </TouchableOpacity>
-          </View>
+          <AnimatedSegmentControl
+            tabs={['Donations', 'Discounted']}
+            activeTab={activeTab === 'DONATION' ? 'Donations' : 'Discounted'}
+            onChange={(tab) => setActiveTab(tab === 'Donations' ? 'DONATION' : 'DISCOUNT')}
+            variant="dark"
+          />
         </View>
 
         {loading ? (
           <ActivityIndicator size="large" color="#0D9488" style={{ marginTop: 60 }} />
         ) : (
           <FlatList
+            key={`list-${focusKey}`}
             data={filteredListings}
             renderItem={renderItem}
             keyExtractor={item => item.id.toString()}
@@ -292,53 +280,6 @@ const styles = StyleSheet.create({
   toolsContainer: {
     paddingHorizontal: 20,
     marginBottom: 16,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 52,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  searchIcon: {
-    marginRight: 10,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-  },
-  tabText: {
-    color: '#94A3B8',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  activeTabText: {
-    color: '#5EEAD4',
-    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: 20,

@@ -1,8 +1,14 @@
 import React, { useCallback, useContext, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
+
 import MiniMap from '../../components/MiniMap';
+import ProfileCard from '../../components/ProfileCard';
+import ComboButton from '../../components/ComboButton';
 import { AuthContext } from '../../context/AuthContext';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
@@ -12,10 +18,12 @@ export default function DonorProfileScreen() {
   const { logout } = useContext(AuthContext);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [focusKey, setFocusKey] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
+      setFocusKey(prev => prev + 1);
     }, [])
   );
 
@@ -32,6 +40,7 @@ export default function DonorProfileScreen() {
   };
 
   const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await logout();
       router.replace('/(auth)/login');
@@ -41,6 +50,7 @@ export default function DonorProfileScreen() {
   };
 
   const confirmDeleteAccount = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
       "Delete Account",
       "Are you sure you want to delete your business account? This action cannot be undone.",
@@ -64,85 +74,138 @@ export default function DonorProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.headerTitle}>Business Profile</Text>
+    <View style={styles.container}>
+      {/* Master Dark Teal Gradient Background */}
+      <LinearGradient
+        colors={['#042F2E', '#d9dfe9ff']}
+        style={StyleSheet.absoluteFill}
+      />
 
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarPlaceholder}>
-            {profile?.profile_picture ? (
-              <Image source={{ uri: profile.profile_picture }} style={styles.avatarImage} />
-            ) : (
-              <Ionicons name="storefront" size={40} color="#3b82f6" />
-            )}
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profile?.business_name || profile?.first_name || 'Loading...'}</Text>
-            {profile?.first_name && <Text style={styles.ownerName}>Manager: {profile.first_name}</Text>}
-            <Text style={styles.email}>{profile?.email || 'Loading...'}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Verified Donor</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/(forms)/edit-kitchen-profile/me' as any)}>
-            <Ionicons name="create-outline" size={20} color="#64748b" />
-          </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Header */}
+        <View style={styles.heroHeader}>
+          <Text style={styles.heroTitle}>Business Profile</Text>
+          <Text style={styles.heroSubtitle}>Manage your account & location</Text>
         </View>
 
-        {profile?.address && profile?.latitude && profile?.longitude && (
-          <View style={styles.locationSection}>
-            <Text style={styles.sectionTitle}>Business Location</Text>
-            <View style={styles.locationCard}>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-sharp" size={20} color="#ef4444" style={styles.locationIcon} />
-                <Text style={styles.addressText}>{profile.address}</Text>
-              </View>
-              <View style={styles.miniMapContainer}>
-                <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
-              </View>
-            </View>
-          </View>
-        )}
-        <View style={{ marginTop: 'auto', paddingTop: 24 }}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-          <TouchableOpacity style={[styles.logoutButton, { marginTop: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#ef4444' }]} onPress={confirmDeleteAccount} disabled={isDeleting}>
-            <Ionicons name="trash-outline" size={22} color="#ef4444" />
-            <Text style={styles.logoutText}>{isDeleting ? 'Deleting...' : 'Delete Account'}</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          <ProfileCard key={`profile-card-${focusKey}`} profile={profile} />
+
+          {profile?.address && profile?.latitude && profile?.longitude && (
+            <MotiView
+              key={`location-section-${focusKey}`}
+              from={{ opacity: 0, translateY: 20 }}
+              animate={{ opacity: 1, translateY: 0 }}
+              transition={{ type: 'spring', delay: 150 }}
+              style={styles.locationSection}
+            >
+              <Text style={styles.sectionTitle}>BUSINESS LOCATION</Text>
+
+              <View style={styles.locationCard}>
+                <LinearGradient
+                  colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.01)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+
+                <View style={styles.addressRow}>
+                  <View style={styles.locationIconWrapper}>
+                    <Ionicons name="location" size={20} color="#5EEAD4" />
+                  </View>
+                  <Text style={styles.addressText}>{profile.address}</Text>
+                </View>
+
+                <View style={styles.miniMapContainer}>
+                  <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
+                </View>
+              </View>
+            </MotiView>
+          )}
+
+          <ComboButton 
+            key={`combo-button-${focusKey}`}
+            onLogout={handleLogout} 
+            onDelete={confirmDeleteAccount} 
+            isDeleting={isDeleting} 
+          />
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 40, flexGrow: 1 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginVertical: 16 },
-  
-  profileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, position: 'relative' },
-  editProfileBtn: { position: 'absolute', top: 12, right: 12, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 20, zIndex: 10, elevation: 3 },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', marginRight: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImage: { width: '100%', height: '100%' },
-  profileInfo: { flex: 1 },
-  name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
-  ownerName: { fontSize: 13, color: '#475569', fontWeight: '500', marginBottom: 4 },
-  email: { fontSize: 14, color: '#64748b', marginBottom: 8 },
-  badge: { backgroundColor: '#d1fae5', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 12, fontWeight: 'bold', color: '#065f46' },
+  container: { flex: 1, backgroundColor: '#c3cddbff', paddingBottom: 30 },
+  safeArea: { flex: 1 },
+
+  heroHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+  },
+
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120, // Tab bar clearance
+  },
 
   locationSection: { marginBottom: 32 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 12, marginLeft: 4 },
-  locationCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, overflow: 'hidden' },
-  addressRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  locationIcon: { marginRight: 8 },
-  addressText: { fontSize: 15, color: '#334155', flex: 1, fontWeight: '500' },
-  miniMapContainer: { height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#e2e8f0' },
-
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fee2e2', padding: 16, borderRadius: 12 },
-  logoutText: { fontSize: 16, fontWeight: 'bold', color: '#ef4444', marginLeft: 8 }
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: 'rgba(255, 255, 255, 0.5)',
+    marginBottom: 12,
+    marginLeft: 4,
+    letterSpacing: 1.5,
+  },
+  locationCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  locationIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(94, 234, 212, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addressText: {
+    fontSize: 15,
+    color: '#E2E8F0',
+    flex: 1,
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  miniMapContainer: {
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  }
 });
