@@ -199,11 +199,11 @@ export default function RegisterScreen() {
       };
 
       if (role === 'donor') {
-        router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
+        router.push({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
       } else if (role === 'shelter') {
-        router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
+        router.push({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
       } else {
-        router.replace({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { ...params, id: 'new' } });
+        router.push({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { ...params, id: 'new' } });
       }
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

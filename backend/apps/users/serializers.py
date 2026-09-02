@@ -23,7 +23,7 @@ class Base64ImageField(serializers.ImageField):
             data = ContentFile(base64.b64decode(imgstr), name=file_name)
         elif isinstance(data, str) and (data.startswith('http://') or data.startswith('https://') or data.startswith('/media/')):
             # Existing image URL passed back, don't re-save or clear
-            return serializers.SkipField()
+            raise serializers.SkipField()
         return super().to_internal_value(data)
 
 class UserSerializer(serializers.ModelSerializer):

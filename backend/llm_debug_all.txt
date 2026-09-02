@@ -1,0 +1,5 @@
+
+[GEMINI ERROR] Title: rice | Exception: HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=15)
+
+[SUCCESS] Title: rice | Qty: 10 kgs
+Result: {'is_fraudulent': False, 'suggested_value_inr': 500.0, 'report': {'reasoning': 'The donation consists of 10 kgs of standard retail rice. In the Indian market, everyday non-premium rice (such as Sona Masoori or regular medium-grain) typically retails between ₹40 and ₹60 per kg. To maintain a conservative, fraud-resistant valuation aligned with 80G tax receipt guidelines, an average of ₹50 per kg is applied. This yields a total fair market value of ₹500. As this is a raw commodity donation, no labour, service, or miscellaneous costs are applicable.', 'breakdown': {'ingredients': 500.0, 'labour': 0.0, 'service': 0.0, 'misc': 0.0}}}

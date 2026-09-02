@@ -45,7 +45,10 @@ export default function LoginScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Reset entrance values so animation replays when returning from signup
+      let animationFrameId: number;
+
+    const startAnimations = () => {
+      // Reset entrance values
       fadeAnim.setValue(0);
       slideAnim.setValue(80);
       cardScale.setValue(0.9);
@@ -56,7 +59,7 @@ export default function LoginScreen() {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 1000,
+          duration: 800,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
@@ -77,29 +80,28 @@ export default function LoginScreen() {
           friction: 6,
           useNativeDriver: true,
         }),
-        Animated.sequence([
-          Animated.delay(300),
-          Animated.stagger(150, staggerAnims.map(anim =>
-            Animated.spring(anim, {
-              toValue: 1,
-              tension: 40,
-              friction: 7,
-              useNativeDriver: true,
-            })
-          ))
-        ]),
+        Animated.stagger(100, staggerAnims.map(anim =>
+          Animated.spring(anim, {
+            toValue: 1,
+            tension: 40,
+            friction: 7,
+            useNativeDriver: true,
+          })
+        )),
         Animated.spring(logoScale, {
           toValue: 1,
           tension: 60,
           friction: 6,
-          delay: 500,
+          delay: 200,
           useNativeDriver: true,
         })
       ]).start();
-    }, [])
-  );
+    };
 
-  useEffect(() => {
+    // Defer animation until after the initial render and transition layout
+    animationFrameId = requestAnimationFrame(() => {
+      startAnimations();
+    });
 
     // Ambient Logo Float
     Animated.loop(
@@ -108,8 +110,6 @@ export default function LoginScreen() {
         Animated.timing(logoFloat, { toValue: 0, duration: 2000, useNativeDriver: true }),
       ])
     ).start();
-
-    // Looped Ambient Blob Animations
     const animateBlob = (anim: Animated.Value, duration: number) => {
       Animated.loop(
         Animated.sequence([
@@ -131,7 +131,12 @@ export default function LoginScreen() {
     animateBlob(blob2, 7500);
     animateBlob(blob3, 5000);
     animateBlob(blob4, 8000);
-  }, []);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+    }, [])
+  );
 
   // Helper for generating oscillating transform styles
   const getBlobStyle = (anim: Animated.Value, moveX: number, moveY: number, maxScale: number) => ({
@@ -167,14 +172,6 @@ export default function LoginScreen() {
     resolver: yupResolver(schema),
     defaultValues: { email: '', password: '' }
   });
-
-  // Clear the form state every time the screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      reset();
-      setErrorMsg('');
-    }, [reset])
-  );
 
   const handleAdminLogin = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

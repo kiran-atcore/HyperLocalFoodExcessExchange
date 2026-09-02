@@ -115,6 +115,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRejectionCount(0);
     setRejectionReason(null);
     setIsAuthenticated(false);
+    
+    if (router.canDismiss()) {
+      router.dismissAll();
+    }
     router.replace('/(auth)/login');
   };
 

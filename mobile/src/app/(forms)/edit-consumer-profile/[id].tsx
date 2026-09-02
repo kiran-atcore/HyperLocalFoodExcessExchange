@@ -6,19 +6,22 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../../utils/api';
 import { AuthContext } from '../../../context/AuthContext';
+import LocationBanner from '../../../components/LocationBanner';
 import ProfileImagePicker from '../../../components/ProfileImagePicker';
 import ButtonOne from '../../../components/ButtonOne';
+import LoadingScreen from '../../../components/LoadingScreen';
+import { useAlert } from '../../../context/AlertContext';
 
 const RadarRipple = ({ initialDelay = 0 }: { initialDelay?: number }) => {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const startAnimation = (delay: number) => {
       if (!isMounted) return;
       anim.setValue(0);
-      
+
       // Randomize to make it feel organic (water ripples / radar)
       const duration = 5000 + Math.random() * 4000; // between 5s and 9s
       const nextDelay = 200 + Math.random() * 2000; // between 0.2s and 2.2s
@@ -38,7 +41,7 @@ const RadarRipple = ({ initialDelay = 0 }: { initialDelay?: number }) => {
     };
 
     startAnimation(initialDelay);
-    
+
     return () => {
       isMounted = false;
       anim.stopAnimation();
@@ -62,6 +65,7 @@ export default function EditConsumerProfileScreen() {
   const params = useLocalSearchParams();
   const id = params.id;
   const { login } = useContext(AuthContext);
+  const { showAlert } = useAlert();
 
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -123,7 +127,7 @@ export default function EditConsumerProfileScreen() {
       setAddress(data.address || '');
       setProfilePicture(data.profile_picture || null);
     } catch (e) {
-      Alert.alert("Error", "Could not load profile");
+      showAlert("Error", "Could not load profile", "error");
       router.back();
     } finally {
       setLoading(false);
@@ -146,30 +150,21 @@ export default function EditConsumerProfileScreen() {
     }
   }, [loading]);
 
-  const getBlobStyle = (anim: Animated.Value, moveX: number, moveY: number, maxScale: number) => ({
-    transform: [
-      { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [-moveX, moveX] }) },
-      { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-moveY, moveY] }) },
-      { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, maxScale] }) },
-      { rotate: anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }
-    ]
-  });
-
   const handleUpdate = async () => {
     const phoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/;
     const cleanPhone = phoneNumber.replace(/\s+/g, '');
 
     if (!name.trim()) {
-      Alert.alert("Required Field", "Please enter your name.");
+      showAlert("Required Field", "Please enter your name.", "warning");
       return;
     }
 
-    if (id === 'new' || cleanPhone) {
-      if (cleanPhone && !phoneRegex.test(cleanPhone)) {
-        Alert.alert("Invalid Phone Number", "Please provide a valid Indian phone number.");
-        return;
-      }
+    if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
+      showAlert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).", "error");
+      return;
     }
+
+
 
     setIsSubmitting(true);
     try {
@@ -200,15 +195,16 @@ export default function EditConsumerProfileScreen() {
           profile_picture: profilePicture,
         };
         await api.patch('/users/me/', payload);
-        Alert.alert("Updated", "Your profile has been updated.");
-        router.back();
+        showAlert("Updated", "Your profile has been updated.", "success", () => {
+          router.back();
+        });
       }
     } catch (e: any) {
       console.error(e.response?.data || e.message);
       const errorMsg = e.response?.data?.email
         ? "Email is already registered."
         : (e.response?.data?.detail || "Failed to save profile. Please try again.");
-      Alert.alert("Error", errorMsg);
+      showAlert("Error", errorMsg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -218,16 +214,12 @@ export default function EditConsumerProfileScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#042F2E" />
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        <View style={styles.headerButtonContainer} pointerEvents="box-none">
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{id === 'new' ? 'Profile Setup' : 'Edit Profile'}</Text>
-          <View style={styles.placeholder} />
         </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-        </View>
+        <LoadingScreen message="Fetching Profile..." />
       </SafeAreaView>
     );
   }
@@ -279,17 +271,13 @@ export default function EditConsumerProfileScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-        {/* Dark Teal Header */}
-        <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
-          </TouchableOpacity>
+        {/* Title layer behind ScrollView */}
+        <Animated.View style={[styles.headerTextContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text style={styles.headerTitle}>{id === 'new' ? 'Setup Profile' : 'Edit Profile'}</Text>
-          <View style={styles.placeholder} />
         </Animated.View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          
+        <ScrollView style={{ flex: 1, zIndex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+
           {/* Hyper-local Radar Ripples aligned exactly behind the avatar's center */}
           <View style={styles.rippleContainer} pointerEvents="none">
             <RadarRipple initialDelay={0} />
@@ -351,6 +339,13 @@ export default function EditConsumerProfileScreen() {
 
           </LinearGradient>
         </ScrollView>
+
+        {/* Back button layer above ScrollView */}
+        <Animated.View style={[styles.headerButtonContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]} pointerEvents="box-none">
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -378,18 +373,22 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: 'rgba(20, 184, 166, 0.4)',
   },
-  header: {
+  headerTextContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
-    flexDirection: 'row',
+    zIndex: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 14,
+  },
+  headerButtonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: 'transparent',
   },
   backBtn: { padding: 4, marginLeft: -8 },
   headerTitle: {

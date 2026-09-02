@@ -16,7 +16,7 @@ class Base64ImageField(serializers.ImageField):
             file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
             data = ContentFile(base64.b64decode(imgstr), name=file_name)
         elif isinstance(data, str) and (data.startswith('http://') or data.startswith('https://') or data.startswith('/media/')):
-            return serializers.SkipField()
+            raise serializers.SkipField()
         return super().to_internal_value(data)
 
 class FoodListingSerializer(serializers.ModelSerializer):

@@ -1,18 +1,72 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, DeviceEventEmitter, Animated, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../../utils/api';
 import LocationBanner from '../../../components/LocationBanner';
 import ProfileImagePicker from '../../../components/ProfileImagePicker';
+import ButtonOne from '../../../components/ButtonOne';
+import LoadingScreen from '../../../components/LoadingScreen';
 import * as Location from 'expo-location';
 import { AuthContext } from '../../../context/AuthContext';
+import { useAlert } from '../../../context/AlertContext';
+
+const RadarRipple = ({ initialDelay = 0 }: { initialDelay?: number }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const startAnimation = (delay: number) => {
+      if (!isMounted) return;
+      anim.setValue(0);
+
+      const duration = 5000 + Math.random() * 4000;
+      const nextDelay = 200 + Math.random() * 2000;
+
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: duration,
+          useNativeDriver: true,
+        })
+      ]).start((result) => {
+        if (result.finished && isMounted) {
+          startAnimation(nextDelay);
+        }
+      });
+    };
+
+    startAnimation(initialDelay);
+
+    return () => {
+      isMounted = false;
+      anim.stopAnimation();
+    };
+  }, [anim, initialDelay]);
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.5, 4.0],
+  });
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.05, 1],
+    outputRange: [0, 0.25, 0],
+  });
+
+  return <Animated.View style={[styles.ripple, { transform: [{ scale }], opacity }]} />;
+};
 
 export default function EditShelterProfileScreen() {
   const params = useLocalSearchParams();
   const id = params.id;
   const { login } = React.useContext(AuthContext);
+  const { showAlert } = useAlert();
+
   const [businessName, setBusinessName] = useState('');
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -20,6 +74,7 @@ export default function EditShelterProfileScreen() {
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regRole, setRegRole] = useState('');
@@ -27,6 +82,17 @@ export default function EditShelterProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hasManualLocation = useRef(false);
+  const [focusedInput, setFocusedInput] = useState<string | null>(null);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(60)).current;
+  const staggerAnims = useRef([...Array(5)].map(() => new Animated.Value(0))).current;
+
+  // Refs for manual focus
+  const bNameRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (id === 'new') {
@@ -55,12 +121,27 @@ export default function EditShelterProfileScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 0, tension: 20, friction: 7, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(150),
+          Animated.stagger(100, staggerAnims.map(anim =>
+            Animated.spring(anim, { toValue: 1, tension: 40, friction: 7, useNativeDriver: true })
+          ))
+        ])
+      ]).start();
+    }
+  }, [loading]);
+
   const fetchCurrentLocation = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setAddress('');
-        return; 
+        return;
       }
       let location;
       try {
@@ -68,20 +149,20 @@ export default function EditShelterProfileScreen() {
       } catch (e) {
         location = await Location.getLastKnownPositionAsync({});
       }
-      
+
       if (!location) {
         setAddress('');
         return;
       }
-      
+
       const { latitude, longitude } = location.coords;
       let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-      
+
       if (hasManualLocation.current) return;
 
       setLat(latitude);
       setLng(longitude);
-      
+
       if (geocode.length > 0) {
         const addr = geocode[0];
         const addressString = [addr.name, addr.street, addr.city, addr.region, addr.country].filter(Boolean).join(', ');
@@ -106,8 +187,9 @@ export default function EditShelterProfileScreen() {
       setLat(data.latitude || null);
       setLng(data.longitude || null);
       setProfilePicture(data.profile_picture || null);
-    } catch (e) {
-      Alert.alert("Error", "Could not load profile");
+    } catch (error) {
+      console.error(error);
+      showAlert("Error", "Could not load profile", "error");
       router.back();
     } finally {
       setLoading(false);
@@ -118,20 +200,21 @@ export default function EditShelterProfileScreen() {
     const phoneRegex = /^(?:\+91|91|0)?[6-9]\d{9}$/;
     const cleanPhone = phoneNumber.replace(/\s+/g, '');
 
-    if (id === 'new') {
-      if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
-        Alert.alert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).");
-        return;
-      }
-      if (!address.trim() || !lat || !lng) {
-        Alert.alert("Required Field", "Please select your location from the map.");
-        return;
-      }
-    } else {
-      if (cleanPhone && !phoneRegex.test(cleanPhone)) {
-        Alert.alert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).");
-        return;
-      }
+    if (!businessName.trim()) {
+      showAlert("Required Field", "Please enter the Shelter/NGO Name.", "warning");
+      return;
+    }
+    if (!name.trim()) {
+      showAlert("Required Field", "Please enter the Coordinator/Representative Name.", "warning");
+      return;
+    }
+    if (!cleanPhone || !phoneRegex.test(cleanPhone)) {
+      showAlert("Invalid Phone Number", "Please provide a valid Indian phone number (e.g. +91 9876543210).", "error");
+      return;
+    }
+    if (!lat || !lng || !address) {
+      showAlert("Required Field", "Please select your location from the map.", "warning");
+      return;
     }
 
     setIsSubmitting(true);
@@ -155,8 +238,9 @@ export default function EditShelterProfileScreen() {
           password: regPassword || (params.password as string),
         });
         await login(loginRes.data.access, loginRes.data.refresh);
-        Alert.alert("Request Sent", "Your account is pending admin approval.");
-        router.replace('/');
+        showAlert("Request Sent", "Your account is pending admin approval.", "success", () => {
+          router.replace('/');
+        });
       } else {
         const payload = {
           business_name: businessName,
@@ -168,12 +252,13 @@ export default function EditShelterProfileScreen() {
           profile_picture: profilePicture,
         };
         await api.patch('/users/me/', payload);
-        Alert.alert("Updated", "Your profile has been updated.");
-        router.back();
+        showAlert("Updated", "Your profile has been updated.", "success", () => {
+          router.back();
+        });
       }
-    } catch (e: any) {
-      console.error(e.response?.data || e.message);
-      Alert.alert("Error", "Failed to update profile");
+    } catch (error: any) {
+      console.error(error);
+      showAlert("Error", "Failed to update profile", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -187,99 +272,341 @@ export default function EditShelterProfileScreen() {
     }
   };
 
+  const renderInput = (
+    label: string,
+    value: string,
+    setValue: (val: string) => void,
+    placeholder: string,
+    iconName: keyof typeof Ionicons.glyphMap,
+    keyboardType: any = 'default',
+    inputKey: string,
+    isMultiline: boolean = false,
+    inputRef?: any
+  ) => {
+    const isFocused = focusedInput === inputKey;
+    return (
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => inputRef?.current?.focus()}
+        style={[styles.inputContainer, isFocused && styles.inputContainerFocused, isMultiline && { alignItems: 'flex-start' }]}
+      >
+        <View style={[styles.iconWrapper, isFocused && styles.iconWrapperFocused]}>
+          <Ionicons name={iconName} size={20} color={isFocused ? "#FFFFFF" : "#64748B"} />
+        </View>
+        <View style={[styles.inputContent, isMultiline && { paddingTop: 8 }]}>
+          <Text style={[styles.internalLabel, isFocused && styles.internalLabelFocused]}>{label}</Text>
+          <TextInput
+            ref={inputRef}
+            style={[styles.input, isMultiline && { height: 84, textAlignVertical: 'top' }]}
+            value={value}
+            onChangeText={setValue}
+            placeholder={placeholder}
+            placeholderTextColor="#94A3B8"
+            keyboardType={keyboardType}
+            onFocus={() => setFocusedInput(inputKey)}
+            onBlur={() => setFocusedInput(null)}
+            multiline={isMultiline}
+            numberOfLines={isMultiline ? 3 : 1}
+          />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#0f172a" />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor="#042F2E" />
+        <View style={styles.headerButtonContainer} pointerEvents="box-none">
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{id === 'new' ? 'Shelter Setup' : 'Edit Profile'}</Text>
-          <View style={styles.placeholder} />
         </View>
-        <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
+        <LoadingScreen message="Fetching Profile..." />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#0f172a" />
-          </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor="#042F2E" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+
+        {/* Title layer behind ScrollView */}
+        <Animated.View style={[styles.headerTextContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
           <Text style={styles.headerTitle}>{id === 'new' ? 'Shelter Setup' : 'Edit Profile'}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        </Animated.View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
-          <ProfileImagePicker
-            imageUri={profilePicture}
-            defaultInitial={businessName ? businessName.charAt(0) : 'S'}
-            defaultIcon="business"
-            onImageSelected={(img) => setProfilePicture(img)}
-            onImageRemoved={() => setProfilePicture(null)}
-          />
+        <ScrollView style={{ flex: 1, zIndex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-          <Text style={styles.sectionTitle}>Organization Details</Text>
-          <View style={styles.card}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Shelter / NGO Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Hope Shelter Organization" value={businessName} onChangeText={setBusinessName} />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Coordinator / Representative Name</Text>
-              <TextInput style={styles.input} placeholder="e.g. Jane Doe" value={name} onChangeText={setName} />
-            </View>
-            <View style={[styles.inputGroup, { marginBottom: 0 }]}>
-              <Text style={styles.label}>Phone Number</Text>
-              <TextInput style={styles.input} placeholder="e.g. +91 98765 43210" keyboardType="phone-pad" value={phoneNumber} onChangeText={setPhoneNumber} />
-            </View>
+          <View style={styles.rippleContainer} pointerEvents="none">
+            <RadarRipple initialDelay={0} />
+            <RadarRipple initialDelay={1200} />
+            <RadarRipple initialDelay={2800} />
+            <RadarRipple initialDelay={4000} />
           </View>
 
-          <Text style={styles.sectionTitle}>Location Details</Text>
-          <View style={styles.card}>
-            <LocationBanner 
-              address={address} 
-              onLocationChange={(newAddress, newLat, newLng) => {
-                setAddress(newAddress);
-                if (newLat && newLng) {
-                  setLat(newLat);
-                  setLng(newLng);
-                }
-              }} 
-              onMapPress={openMap}
-            />
-          </View>
+          <LinearGradient
+            colors={['#F0FDFA', '#FFF1F2']}
+            style={styles.sheetContainer}
+          >
+            <Animated.View style={[styles.profilePicWrapper, {
+              opacity: staggerAnims[0],
+              transform: [{ translateY: staggerAnims[0].interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }]
+            }]}>
+              <ProfileImagePicker
+                imageUri={profilePicture}
+                defaultInitial={businessName ? businessName.charAt(0) : 'S'}
+                defaultIcon="business"
+                onImageSelected={(img) => setProfilePicture(img)}
+                onImageRemoved={() => setProfilePicture(null)}
+              />
+            </Animated.View>
 
-          <TouchableOpacity style={[styles.publishBtn, isSubmitting && { opacity: 0.7 }]} onPress={handleUpdate} disabled={isSubmitting}>
-            <Ionicons name="save-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.publishBtnText}>
-              {isSubmitting ? 'Saving...' : (id === 'new' ? 'Request Access' : 'Save Profile')}
-            </Text>
-          </TouchableOpacity>
+            <View style={styles.formSection}>
+              <Animated.View style={{ opacity: staggerAnims[1], transform: [{ translateY: staggerAnims[1].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionIcon}>
+                    <Ionicons name="business" size={14} color="#0D9488" />
+                  </View>
+                  <Text style={styles.sectionTitle}>Organization Details</Text>
+                </View>
 
+                {renderInput(
+                  "Shelter / NGO Name *",
+                  businessName,
+                  setBusinessName,
+                  "e.g. Hope Shelter Organization",
+                  "business-outline",
+                  "default",
+                  "off",
+                  false,
+                  bNameRef
+                )}
+
+                {renderInput(
+                  "Coordinator / Representative Name *",
+                  name,
+                  setName,
+                  "e.g. Jane Doe",
+                  "person-outline",
+                  "default",
+                  "name",
+                  false,
+                  nameRef
+                )}
+
+                {renderInput(
+                  "Phone Number *",
+                  phoneNumber,
+                  setPhoneNumber,
+                  "e.g. +91 9876543210",
+                  "call-outline",
+                  "phone-pad",
+                  "tel",
+                  false,
+                  phoneRef
+                )}
+              </Animated.View>
+            </View>
+
+            <View style={styles.formSection}>
+              <Animated.View style={{ opacity: staggerAnims[2], transform: [{ translateY: staggerAnims[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionIcon}>
+                    <Ionicons name="map" size={14} color="#0D9488" />
+                  </View>
+                  <Text style={styles.sectionTitle}>Location Details</Text>
+                </View>
+
+                <LocationBanner
+                  address={address}
+                  onLocationChange={(newAddress, newLat, newLng) => {
+                    setAddress(newAddress);
+                    if (newLat && newLng) {
+                      setLat(newLat);
+                      setLng(newLng);
+                    }
+                  }}
+                  onMapPress={openMap}
+                />
+              </Animated.View>
+            </View>
+
+            <Animated.View style={{ opacity: staggerAnims[3], transform: [{ translateY: staggerAnims[3].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+              <ButtonOne
+                title={id === 'new' ? 'Complete Setup' : 'Save Changes'}
+                onPress={handleUpdate}
+                isLoading={isSubmitting}
+              />
+            </Animated.View>
+
+          </LinearGradient>
         </ScrollView>
+
+        {/* Back button layer above ScrollView */}
+        <Animated.View style={[styles.headerButtonContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]} pointerEvents="box-none">
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#042F2E' },
+  rippleContainer: {
+    position: 'absolute',
+    top: 140,
+    left: '50%',
+    marginLeft: -150,
+    marginTop: -150,
+    width: 300,
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 0,
+  },
+  ripple: {
+    position: 'absolute',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: 'rgba(20, 184, 166, 0.4)',
+  },
+  headerTextContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 0,
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  headerButtonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  backBtn: { padding: 4, marginLeft: -8 },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.15)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
   placeholder: { width: 32 },
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 12, marginLeft: 4 },
-  card: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, marginBottom: 24, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 1 },
-  inputGroup: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#475569', marginBottom: 6 },
-  input: { backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 10, fontSize: 15, color: '#0f172a', borderWidth: 1, borderColor: '#e2e8f0' },
-  
-  publishBtn: { flexDirection: 'row', backgroundColor: '#3b82f6', paddingVertical: 16, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  publishBtnText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' }
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: 140,
+  },
+
+  sheetContainer: {
+    flex: 1,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    paddingHorizontal: 24,
+    paddingBottom: 60,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+
+  profilePicWrapper: {
+    alignItems: 'center',
+    marginTop: -60,
+    marginBottom: 24,
+  },
+
+  formSection: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(13, 148, 136, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#94A3B8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  inputContainerFocused: {
+    borderColor: '#0D9488',
+    backgroundColor: '#F0FDFA',
+  },
+  iconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  iconWrapperFocused: {
+    backgroundColor: '#0D9488',
+  },
+  inputContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  internalLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  internalLabelFocused: {
+    color: '#0D9488',
+  },
+  input: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+    paddingVertical: 0,
+    lineHeight: 22,
+  },
 });

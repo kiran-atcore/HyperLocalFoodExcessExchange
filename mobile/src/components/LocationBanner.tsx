@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, Easing, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 
 interface LocationBannerProps {
@@ -14,7 +14,48 @@ interface LocationBannerProps {
 export default function LocationBanner({ address, onLocationChange, onMapPress, autoFetch }: LocationBannerProps = {}) {
   const [isFetching, setIsFetching] = useState(false);
 
-  React.useEffect(() => {
+  // High-End Animations
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
+  // Ambient breathing glow
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0, duration: 2500, easing: Easing.inOut(Easing.ease), useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
+
+  // Radar spin during fetch
+  useEffect(() => {
+    if (isFetching) {
+      spinAnim.setValue(0);
+      Animated.loop(
+        Animated.timing(spinAnim, { toValue: 1, duration: 1200, easing: Easing.linear, useNativeDriver: true })
+      ).start();
+    } else {
+      spinAnim.stopAnimation();
+      spinAnim.setValue(0);
+    }
+  }, [isFetching]);
+
+  const spin = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg']
+  });
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 0.96, useNativeDriver: true }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }).start();
+  };
+
+  useEffect(() => {
     if (autoFetch) {
       fetchGPSLocation();
     }
@@ -32,26 +73,19 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
 
       let location;
       try {
-        // Try to get a cached/last known position first for instant speed
         location = await Location.getLastKnownPositionAsync({});
-        
         if (!location) {
-          // If no known position, fetch a fresh one but with Low accuracy for speed
           location = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Low,
           });
         }
-        
-        if (!location) {
-          throw new Error('GPS not available.');
-        }
+        if (!location) throw new Error('GPS not available.');
       } catch (e) {
         Alert.alert('Error', 'Emulator GPS not set. Please set a location in Extended Controls.');
         setIsFetching(false);
         return;
       }
       
-      // Use free OpenStreetMap Nominatim API for reverse geocoding
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${location.coords.latitude}&lon=${location.coords.longitude}&format=json`,
         { headers: { 'User-Agent': 'HyperLocalFoodExcessExchange/1.0' } }
@@ -63,7 +97,6 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
       } else {
         onLocationChange?.(`GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`, location.coords.latitude, location.coords.longitude);
       }
-
     } catch (error: any) {
       Alert.alert('Error fetching location', error.message || 'Please ensure your emulator has a location set in Extended Controls.');
       onLocationChange?.('Location Unavailable', undefined, undefined);
@@ -73,69 +106,143 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
   };
 
   return (
-    <View style={styles.bannerContainer}>
-      <TouchableOpacity 
-        style={styles.textContainer} 
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <Pressable 
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         onPress={onMapPress}
       >
-        <Ionicons name="location-outline" size={20} color="#10b981" />
-        <View style={styles.textWrapper}>
-          <Text style={styles.label}>Your Location</Text>
-          <Text style={styles.address} numberOfLines={1}>{address || 'Select a location...'}</Text>
-        </View>
-      </TouchableOpacity>
+        <LinearGradient
+          colors={['#FFFFFF', '#F8FAFC']}
+          style={styles.card}
+        >
+          {/* Ambient Breathing Glow underneath content */}
+          <Animated.View style={[styles.ambientGlow, { 
+            opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.05, 0.4] }) 
+          }]} />
 
-      <TouchableOpacity style={styles.iconButton} onPress={fetchGPSLocation}>
-        {isFetching ? (
-          <ActivityIndicator size="small" color="#10b981" />
-        ) : (
-          <Ionicons name="locate" size={20} color="#10b981" />
-        )}
-      </TouchableOpacity>
-    </View>
+          {/* Left Radar Icon Wrapper */}
+          <View style={styles.leftIconWrapper}>
+            <View style={styles.iconCore}>
+              <Ionicons name="map" size={20} color="#0D9488" />
+            </View>
+          </View>
+          
+          <View style={styles.textWrapper}>
+            <Text style={styles.label}>Geo-Location Uplink</Text>
+            <Text style={styles.address} numberOfLines={2}>
+              {address || 'Awaiting Coordinates...'}
+            </Text>
+          </View>
+
+          {/* GPS Auto-Locate Button */}
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            onPress={(e) => {
+              e.stopPropagation();
+              fetchGPSLocation();
+            }}
+            style={styles.gpsButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <LinearGradient
+              colors={['#0D9488', '#14B8A6']}
+              style={styles.gpsGradient}
+            >
+              <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                <Ionicons 
+                  name={isFetching ? "sync" : "locate"} 
+                  size={22} 
+                  color="#FFFFFF" 
+                />
+              </Animated.View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  bannerContainer: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    padding: 16,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#94A3B8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 5,
   },
-  textContainer: {
-    flex: 1,
-    flexDirection: 'row',
+  ambientGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#CCFBF1',
+    borderRadius: 24,
+  },
+  leftIconWrapper: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  iconCore: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F0FDFA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
   },
   textWrapper: {
-    marginLeft: 8,
-    marginRight: 8,
     flex: 1,
+    marginRight: 12,
   },
   label: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0D9488',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 4,
   },
   address: {
     fontSize: 15,
-    color: '#0f172a',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#0F172A',
+    lineHeight: 20,
   },
-  iconButton: {
-    padding: 8,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    marginLeft: 8,
+  gpsButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  gpsGradient: {
+    flex: 1,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 });

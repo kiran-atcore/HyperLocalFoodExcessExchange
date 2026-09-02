@@ -1,10 +1,64 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import api from '../../utils/api';
-import CountdownTimer from '../../components/CountdownTimer';
+import SurplusCard from '../../components/SurplusCard';
+import { MotiView } from 'moti';
+
+const ParticlesBackground = () => {
+  // Generate a steady stream of faint, rising particles (like digital embers/fireflies)
+  const particles = Array.from({ length: 15 }).map((_, i) => {
+    const size = Math.random() * 4 + 2;
+    return (
+      <MotiView
+        key={i}
+        from={{
+          opacity: 0,
+          translateY: 0,
+          translateX: (Math.random() - 0.5) * 50,
+        }}
+        animate={{
+          opacity: [0, 0.6, 0],
+          translateY: -300 - Math.random() * 200,
+          translateX: (Math.random() - 0.5) * 150,
+        }}
+        transition={{
+          loop: true,
+          type: 'timing',
+          duration: 5000 + Math.random() * 5000,
+          delay: Math.random() * 4000,
+        }}
+        style={{
+          position: 'absolute',
+          bottom: -50,
+          left: `${Math.random() * 100}%`,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#5EEAD4',
+          shadowColor: '#5EEAD4',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.8,
+          shadowRadius: size,
+        }}
+      />
+    );
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <LinearGradient
+        colors={['#042F2E', '#d9dfe9ff']}
+        style={StyleSheet.absoluteFill}
+      />
+      {particles}
+    </View>
+  );
+};
 
 export default function DonorDashboardScreen() {
   const [listings, setListings] = useState<any[]>([]);
@@ -22,8 +76,6 @@ export default function DonorDashboardScreen() {
     const sub = DeviceEventEmitter.addListener('claim_cancelled', (event) => {
       setListings(prev => prev.map(l => {
         if (l.id.toString() === event.listingId.toString()) {
-          // Optimistically reset to active so the delete button shows up instantly. 
-          // The background fetchListings will correct it if it's actually partially sold.
           return { ...l, donor_status: 'Active', quantity_remaining: l.quantity_available };
         }
         return l;
@@ -49,10 +101,11 @@ export default function DonorDashboardScreen() {
       "Are you sure you want to delete this listing? This action cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
-        { 
-          text: "Delete", 
+        {
+          text: "Delete",
           style: "destructive",
           onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
             try {
               await api.delete(`/listings/${id}/`);
               fetchListings();
@@ -64,151 +117,279 @@ export default function DonorDashboardScreen() {
       ]
     );
   };
-  const renderItem = ({ item }: any) => {
-    const isExpired = item.forceExpired || (item.pickup_end && new Date(item.pickup_end).getTime() <= new Date().getTime());
-    const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
-    const displayCount = item.listing_type === 'DONATION' ? item.quantity_available : remainingCount;
-    const isSoldOut = item.donor_status === 'Claimed' || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
-    
+
+  const renderItem = ({ item, index }: any) => {
     return (
-      <TouchableOpacity style={[styles.card, isSoldOut && { opacity: 0.5 }]} onPress={() => router.push(`/(views)/surplus/${item.id}` as any)}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.title, { flex: 1 }]} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.price}>{item.listing_type === 'DONATION' ? 'FREE' : `₹${item.discounted_price}`}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <View style={[
-            styles.statusBadge, 
-            item.donor_status === 'Active' && !isExpired ? styles.statusActive : 
-            item.donor_status === 'Claimed' ? styles.statusClaimed : 
-            isExpired && item.donor_status === 'Active' ? styles.statusExpired : styles.statusPickedUp
-          ]}>
-            <Text style={[
-              styles.statusText,
-              item.donor_status === 'Active' && !isExpired ? styles.textActive : 
-              item.donor_status === 'Claimed' ? styles.textClaimed : 
-              isExpired && item.donor_status === 'Active' ? styles.textExpired : styles.textPickedUp
-            ]}>{isExpired && item.donor_status === 'Active' ? 'Expired' : item.donor_status}</Text>
-          </View>
-          <Text style={styles.details}>{displayCount} {item.quantity_unit || 'portions'} {item.listing_type === 'DONATION' ? '(Total)' : 'available'}</Text>
-        </View>
-        <Text style={[styles.time, { color: '#64748b', marginBottom: 12, fontSize: 13 }]}>
-          Expires in: <CountdownTimer 
-            targetDate={item.pickup_end} 
-            onExpire={() => setListings(prev => prev.map(l => l.id === item.id ? { ...l, forceExpired: true } : l))} 
-          />
-        </Text>
-        <View style={styles.footerRow}>
-          <Text style={styles.time}>Type: {item.listing_type}</Text>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {isExpired && item.donor_status === 'Active' ? (
-              <TouchableOpacity style={[styles.button, { backgroundColor: '#10b981' }]} onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}>
-                <Text style={[styles.buttonText, { color: '#ffffff' }]}>Reactivate</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.button} onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}>
-                <Text style={styles.buttonText}>Edit</Text>
-              </TouchableOpacity>
-            )}
-            {(isExpired || item.donor_status === 'Picked Up' || item.donor_status !== 'Claimed') && (
-              <TouchableOpacity style={styles.deleteButton} onPress={() => handleDelete(item.id)}>
-                <Ionicons name="trash-outline" size={16} color="#ef4444" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
+      <SurplusCard
+        item={item}
+        index={index}
+        onDelete={handleDelete}
+        onExpire={(id: number) => setListings(prev => prev.map(l => l.id === id ? { ...l, forceExpired: true } : l))}
+      />
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Active Surplus</Text>
-      
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Search by title or description..."
-          placeholderTextColor="#94a3b8"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-      
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'DONATION' && styles.activeTab]} 
-          onPress={() => setActiveTab('DONATION')}
-        >
-          <Text style={[styles.tabText, activeTab === 'DONATION' && styles.activeTabText]}>Donations</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'DISCOUNT' && styles.activeTab]} 
-          onPress={() => setActiveTab('DISCOUNT')}
-        >
-          <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.activeTabText]}>Discounted</Text>
-        </TouchableOpacity>
-      </View>
+  const filteredListings = listings.filter(item => {
+    const matchesTab = item.listing_type === activeTab;
+    const notPickedUp = item.donor_status !== 'Picked Up';
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = query === '' ||
+      (item.title && item.title.toLowerCase().includes(query)) ||
+      (item.description && item.description.toLowerCase().includes(query));
+    return matchesTab && notPickedUp && matchesSearch;
+  });
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#3b82f6" style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList 
-          data={listings.filter(item => {
-            const matchesTab = item.listing_type === activeTab;
-            const notPickedUp = item.donor_status !== 'Picked Up';
-            const query = searchQuery.toLowerCase();
-            const matchesSearch = query === '' || 
-              (item.title && item.title.toLowerCase().includes(query)) || 
-              (item.description && item.description.toLowerCase().includes(query));
-            return matchesTab && notPickedUp && matchesSearch;
-          })}
-          renderItem={renderItem} 
-          keyExtractor={item => item.id.toString()} 
-          contentContainerStyle={{ paddingBottom: 100 }}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No active surplus found. Post one!</Text>}
-        />
-      )}
-      
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/(forms)/post-surplus/new' as any)}>
-        <Text style={styles.fabText}>+ Post New Surplus</Text>
-      </TouchableOpacity>
-    </SafeAreaView>
+  return (
+    <View style={styles.container}>
+      <ParticlesBackground />
+
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Hero Header */}
+        <View style={styles.heroHeader}>
+          <View>
+            <Text style={styles.heroTitle}>Dashboard</Text>
+            <Text style={styles.heroSubtitle}>Manage your surplus inventory</Text>
+          </View>
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons name="restaurant" size={24} color="#0D9488" />
+          </View>
+        </View>
+
+        {/* Search & Filter Row */}
+        <View style={styles.toolsContainer}>
+          <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search surplus..."
+              placeholderTextColor="rgba(255, 255, 255, 0.4)"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'DONATION' && styles.activeTab]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setActiveTab('DONATION');
+              }}
+            >
+              <Text style={[styles.tabText, activeTab === 'DONATION' && styles.activeTabText]}>Donations</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'DISCOUNT' && styles.activeTab]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setActiveTab('DISCOUNT');
+              }}
+            >
+              <Text style={[styles.tabText, activeTab === 'DISCOUNT' && styles.activeTabText]}>Discounted</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#0D9488" style={{ marginTop: 60 }} />
+        ) : (
+          <FlatList
+            data={filteredListings}
+            renderItem={renderItem}
+            keyExtractor={item => item.id.toString()}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons name="fast-food-outline" size={64} color="#CBD5E1" />
+                <Text style={styles.emptyStateTitle}>No active surplus</Text>
+                <Text style={styles.emptyStateSubtitle}>You don't have any items in this category. Post something new!</Text>
+              </View>
+            }
+          />
+        )}
+      </SafeAreaView>
+
+      {/* Primary Floating Action Button (Avoids Tab Bar Overlap) */}
+      <MotiView
+        from={{ scale: 1, translateY: 0 }}
+        animate={{ scale: 1.05, translateY: -4 }}
+        transition={{ loop: true, type: 'timing', duration: 1500 }}
+        style={styles.fabContainer}
+      >
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.fab}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/(forms)/post-surplus/new' as any);
+          }}
+        >
+          <LinearGradient colors={['#042F2E', '#0D9488']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabGradient}>
+            {/* Elegant sweeping glass sheen */}
+            <MotiView
+              from={{ translateX: -100 }}
+              animate={{ translateX: 250 }}
+              transition={{ loop: true, type: 'timing', duration: 3000, delay: 800 }}
+              pointerEvents="none"
+              style={{ position: 'absolute', top: 0, bottom: 0, width: 35, backgroundColor: 'rgba(255,255,255,0.2)', transform: [{ skewX: '-20deg' }] }}
+            />
+            <Ionicons name="add" size={24} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={styles.fabText}>Post</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </MotiView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 8, paddingHorizontal: 12, marginBottom: 16, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, height: 44, fontSize: 16, color: '#1e293b' },
-  tabsContainer: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 8, padding: 4, marginBottom: 16 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 6 },
-  activeTab: { backgroundColor: '#ffffff', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
-  tabText: { color: '#64748b', fontWeight: 'bold' },
-  activeTabText: { color: '#0f172a' },
-  card: { backgroundColor: '#ffffff', borderRadius: 12, marginBottom: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#1e293b' },
-  price: { fontSize: 16, fontWeight: 'bold', color: '#10b981' },
-  details: { fontSize: 14, color: '#64748b', marginBottom: 12 },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { fontSize: 14, color: '#ef4444' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
-  statusText: { fontSize: 11, fontWeight: 'bold' },
-  statusActive: { backgroundColor: '#ecfdf5', borderColor: '#a7f3d0' },
-  textActive: { color: '#059669' },
-  statusClaimed: { backgroundColor: '#fffbeb', borderColor: '#fde68a' },
-  textClaimed: { color: '#d97706' },
-  statusExpired: { backgroundColor: '#fef2f2', borderColor: '#fecaca' },
-  textExpired: { color: '#dc2626' },
-  statusPickedUp: { backgroundColor: '#f1f5f9', borderColor: '#cbd5e1' },
-  textPickedUp: { color: '#475569' },
-  button: { backgroundColor: '#e2e8f0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, justifyContent: 'center' },
-  buttonText: { color: '#475569', fontWeight: '600', fontSize: 12 },
-  deleteButton: { backgroundColor: '#fee2e2', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, justifyContent: 'center' },
-  fab: { position: 'absolute', bottom: 30, left: 16, right: 16, backgroundColor: '#0f172a', padding: 16, borderRadius: 12, alignItems: 'center' },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: 'bold' }
+  container: {
+    flex: 1,
+    backgroundColor: '#c3cddbff',
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 4,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+  },
+  toolsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 52,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  searchIcon: {
+    marginRight: 10,
+    color: 'rgba(255, 255, 255, 0.6)',
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  tabText: {
+    color: '#94A3B8',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  activeTabText: {
+    color: '#5EEAD4',
+    fontWeight: '700',
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 200, // Extremely important: Clears the custom FAB AND Tab Bar
+    paddingTop: 8,
+  },
+  fabContainer: {
+    position: 'absolute',
+    bottom: 130, // Shifted higher to completely avoid the Verify button
+    right: 20,
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  fab: {
+    // Moved positioning to fabContainer
+  },
+  fabGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)', // Premium glassy edge
+    overflow: 'hidden', // Contain the sheen
+  },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSubtitle: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+  }
 });
