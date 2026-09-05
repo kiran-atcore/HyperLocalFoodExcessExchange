@@ -23,13 +23,22 @@ class SimpleListingSerializer(serializers.ModelSerializer):
 
 class SimpleUserSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'role', 'email']
+        fields = ['id', 'name', 'role', 'email', 'profile_picture']
         
     def get_name(self, obj):
         return obj.business_name if obj.business_name else obj.first_name
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 class OrderSerializer(serializers.ModelSerializer):
     listing_details = SimpleListingSerializer(source='listing', read_only=True)

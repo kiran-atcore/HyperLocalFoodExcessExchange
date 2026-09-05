@@ -8,6 +8,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import api from '../../../utils/api';
 import CountdownTimer from '../../../components/CountdownTimer';
+import MiniMap from '../../../components/MiniMap';
 
 export default function ReceiptViewScreen() {
   const { id } = useLocalSearchParams();
@@ -154,6 +155,17 @@ export default function ReceiptViewScreen() {
             <Text style={styles.label}>Order ID</Text>
             <Text style={styles.value}>#ORD-{order.id}</Text>
           </View>
+
+          {/* Pickup Location Map */}
+          <View style={styles.mapSection}>
+            <Text style={styles.mapLabel}>Pickup Location</Text>
+            <View style={styles.mapContainer}>
+              <MiniMap
+                latitude={order.listing_details?.donor_latitude || order.listing_details?.latitude || 8.5241}
+                longitude={order.listing_details?.donor_longitude || order.listing_details?.longitude || 76.9366}
+              />
+            </View>
+          </View>
         </View>
 
         {!isRedeemed && (
@@ -187,5 +199,8 @@ const styles = StyleSheet.create({
   backButton: { marginTop: 16, padding: 16, borderRadius: 12, backgroundColor: '#e2e8f0', width: '100%', alignItems: 'center' },
   backButtonText: { color: '#475569', fontWeight: 'bold', fontSize: 16 },
   cancelBtn: { marginTop: 32, padding: 16, borderRadius: 12, backgroundColor: '#fee2e2', width: '100%', alignItems: 'center' },
-  cancelBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 16 }
+  cancelBtnText: { color: '#ef4444', fontWeight: 'bold', fontSize: 16 },
+  mapSection: { width: '100%', marginTop: 8 },
+  mapLabel: { fontSize: 15, color: '#64748b', fontWeight: '600', marginBottom: 10 },
+  mapContainer: { width: '100%', height: 180, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#e2e8f0' }
 });

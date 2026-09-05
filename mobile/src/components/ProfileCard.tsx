@@ -6,7 +6,21 @@ import { MotiView } from 'moti';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-export default function ProfileCard({ profile }: any) {
+export interface ProfileCardProps {
+  profile: any;
+  editRoute?: string;
+  tagText?: string;
+  icon?: any;
+}
+
+export default function ProfileCard({
+  profile,
+  editRoute = '/(forms)/edit-kitchen-profile/me',
+  tagText,
+  icon = 'storefront',
+}: ProfileCardProps) {
+  const displayTag = tagText || (profile?.role === 'shelter' ? 'Verified Shelter' : 'Verified Donor');
+
   return (
     <MotiView
       from={{ opacity: 0, translateY: 30, scale: 0.95 }}
@@ -29,7 +43,7 @@ export default function ProfileCard({ profile }: any) {
               <Image source={{ uri: profile.profile_picture }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="storefront" size={40} color="#5EEAD4" />
+                <Ionicons name={icon} size={40} color="#5EEAD4" />
               </View>
             )}
             <View style={styles.verificationBadge}>
@@ -54,7 +68,7 @@ export default function ProfileCard({ profile }: any) {
             </View>
 
             <View style={styles.tag}>
-              <Text style={styles.tagText}>Verified Donor</Text>
+              <Text style={styles.tagText}>{displayTag}</Text>
             </View>
           </View>
 
@@ -64,7 +78,7 @@ export default function ProfileCard({ profile }: any) {
             style={styles.editBtn} 
             onPress={() => {
               Haptics.selectionAsync();
-              router.push('/(forms)/edit-kitchen-profile/me' as any);
+              router.push(editRoute as any);
             }}
           >
             <LinearGradient

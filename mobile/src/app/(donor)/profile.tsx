@@ -18,12 +18,16 @@ export default function DonorProfileScreen() {
   const { logout } = useContext(AuthContext);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState<any>(null);
-  const [focusKey, setFocusKey] = useState(0);
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       fetchProfile();
-      setFocusKey(prev => prev + 1);
+      
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [])
   );
 
@@ -89,47 +93,48 @@ export default function DonorProfileScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {isScreenFocused && (
+            <>
+              <ProfileCard profile={profile} />
 
-          <ProfileCard key={`profile-card-${focusKey}`} profile={profile} />
+              {profile?.address && profile?.latitude && profile?.longitude && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'spring', delay: 150 }}
+                  style={styles.locationSection}
+                >
+                  <Text style={styles.sectionTitle}>BUSINESS LOCATION</Text>
 
-          {profile?.address && profile?.latitude && profile?.longitude && (
-            <MotiView
-              key={`location-section-${focusKey}`}
-              from={{ opacity: 0, translateY: 20 }}
-              animate={{ opacity: 1, translateY: 0 }}
-              transition={{ type: 'spring', delay: 150 }}
-              style={styles.locationSection}
-            >
-              <Text style={styles.sectionTitle}>BUSINESS LOCATION</Text>
+                  <View style={styles.locationCard}>
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.01)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
 
-              <View style={styles.locationCard}>
-                <LinearGradient
-                  colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.01)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
+                    <View style={styles.addressRow}>
+                      <View style={styles.locationIconWrapper}>
+                        <Ionicons name="location" size={20} color="#5EEAD4" />
+                      </View>
+                      <Text style={styles.addressText}>{profile.address}</Text>
+                    </View>
 
-                <View style={styles.addressRow}>
-                  <View style={styles.locationIconWrapper}>
-                    <Ionicons name="location" size={20} color="#5EEAD4" />
+                    <View style={styles.miniMapContainer}>
+                      <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
+                    </View>
                   </View>
-                  <Text style={styles.addressText}>{profile.address}</Text>
-                </View>
+                </MotiView>
+              )}
 
-                <View style={styles.miniMapContainer}>
-                  <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
-                </View>
-              </View>
-            </MotiView>
+              <ComboButton 
+                onLogout={handleLogout} 
+                onDelete={confirmDeleteAccount} 
+                isDeleting={isDeleting} 
+              />
+            </>
           )}
-
-          <ComboButton 
-            key={`combo-button-${focusKey}`}
-            onLogout={handleLogout} 
-            onDelete={confirmDeleteAccount} 
-            isDeleting={isDeleting} 
-          />
         </ScrollView>
       </SafeAreaView>
     </View>

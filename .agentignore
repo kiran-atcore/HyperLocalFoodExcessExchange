@@ -1,0 +1,54 @@
+# Dependencies & Package Managers
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Python Virtual Environments & Bytecode
+venv/
+**/venv/
+.venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# Database & Storage
+*.sqlite3
+*.sqlite3-journal
+backend/media/
+media/
+
+# Build Outputs & Generated Folders
+.expo/
+dist/
+web-build/
+android/
+ios/
+mobile/android/
+mobile/ios/
+*.tsbuildinfo
+
+# Debug & Temporary Logs
+backend/llm_debug*.txt
+backend/failed_llm_output.txt
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+scratch/
+
+# IDE & OS Metadata
+.git/
+.idea/
+.vscode/
+.DS_Store
+
+# Secrets & Certificates
+*.pem
+*.key
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+.env
+.env*.local

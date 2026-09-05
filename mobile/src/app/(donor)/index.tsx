@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, DeviceEventEmitter, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, DeviceEventEmitter, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import SurplusCard from '../../components/SurplusCard';
 import { MotiView } from 'moti';
 import AnimatedSearchBar from '../../components/AnimatedSearchBar';
 import AnimatedSegmentControl from '../../components/AnimatedSegmentControl';
+import ButtonTwo from '../../components/ButtonTwo';
+import { useAlert } from '../../context/AlertContext';
 
 const ParticlesBackground = () => {
   // Generate a steady stream of faint, rising particles (like digital embers/fireflies)
@@ -62,17 +64,29 @@ const ParticlesBackground = () => {
   );
 };
 
+let savedActiveTab: 'DONATION' | 'DISCOUNT' = 'DONATION';
+
 export default function DonorDashboardScreen() {
+  const { showAlert } = useAlert();
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'DONATION' | 'DISCOUNT'>('DONATION');
+  const [activeTab, setActiveTabState] = useState<'DONATION' | 'DISCOUNT'>(savedActiveTab);
+
+  const setActiveTab = (tab: 'DONATION' | 'DISCOUNT') => {
+    savedActiveTab = tab;
+    setActiveTabState(tab);
+  };
   const [searchQuery, setSearchQuery] = useState('');
-  const [focusKey, setFocusKey] = useState(0);
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      setFocusKey(prev => prev + 1);
+      setIsScreenFocused(true);
       fetchListings();
+      
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [])
   );
 
@@ -100,25 +114,22 @@ export default function DonorDashboardScreen() {
   };
 
   const handleDelete = (id: number) => {
-    Alert.alert(
+    showAlert(
       "Delete Listing",
       "Are you sure you want to delete this listing? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            try {
-              await api.delete(`/listings/${id}/`);
-              fetchListings();
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete listing.");
-            }
-          }
+      "error",
+      async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        try {
+          await api.delete(`/listings/${id}/`);
+          fetchListings();
+        } catch (error) {
+          showAlert("Error", "Failed to delete listing.", "error");
         }
-      ]
+      },
+      "Delete",
+      true,
+      "Cancel"
     );
   };
 
@@ -135,12 +146,11 @@ export default function DonorDashboardScreen() {
 
   const filteredListings = listings.filter(item => {
     const matchesTab = item.listing_type === activeTab;
-    const notPickedUp = item.donor_status !== 'Picked Up';
     const query = searchQuery.toLowerCase();
     const matchesSearch = query === '' ||
       (item.title && item.title.toLowerCase().includes(query)) ||
       (item.description && item.description.toLowerCase().includes(query));
-    return matchesTab && notPickedUp && matchesSearch;
+    return matchesTab && matchesSearch;
   });
 
   return (
@@ -181,18 +191,19 @@ export default function DonorDashboardScreen() {
           <ActivityIndicator size="large" color="#0D9488" style={{ marginTop: 60 }} />
         ) : (
           <FlatList
-            key={`list-${focusKey}`}
-            data={filteredListings}
+            data={isScreenFocused ? filteredListings : []}
             renderItem={renderItem}
             keyExtractor={item => item.id.toString()}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Ionicons name="fast-food-outline" size={64} color="#CBD5E1" />
-                <Text style={styles.emptyStateTitle}>No active surplus</Text>
-                <Text style={styles.emptyStateSubtitle}>You don't have any items in this category. Post something new!</Text>
-              </View>
+              isScreenFocused ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="fast-food-outline" size={64} color="#CBD5E1" />
+                  <Text style={styles.emptyStateTitle}>No active surplus</Text>
+                  <Text style={styles.emptyStateSubtitle}>You don't have any items in this category. Post something new!</Text>
+                </View>
+              ) : null
             }
           />
         )}
@@ -205,27 +216,15 @@ export default function DonorDashboardScreen() {
         transition={{ loop: true, type: 'timing', duration: 1500 }}
         style={styles.fabContainer}
       >
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.fab}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.push('/(forms)/post-surplus/new' as any);
-          }}
-        >
-          <LinearGradient colors={['#042F2E', '#0D9488']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.fabGradient}>
-            {/* Elegant sweeping glass sheen */}
-            <MotiView
-              from={{ translateX: -100 }}
-              animate={{ translateX: 250 }}
-              transition={{ loop: true, type: 'timing', duration: 3000, delay: 800 }}
-              pointerEvents="none"
-              style={{ position: 'absolute', top: 0, bottom: 0, width: 35, backgroundColor: 'rgba(255,255,255,0.2)', transform: [{ skewX: '-20deg' }] }}
-            />
-            <Ionicons name="add" size={24} color="#FFF" style={{ marginRight: 6 }} />
-            <Text style={styles.fabText}>Post</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <ButtonTwo
+          title="Post"
+          icon="add"
+          onPress={() => router.push('/(forms)/post-surplus/new' as any)}
+          colors={['#042F2E', '#0D9488']}
+          contentStyle={styles.fabGradient}
+          textStyle={styles.fabText}
+          sheen={true}
+        />
       </MotiView>
     </View>
   );

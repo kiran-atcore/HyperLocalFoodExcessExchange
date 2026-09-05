@@ -87,44 +87,61 @@ export default function SurplusCard({ item, index, onDelete, onExpire }: any) {
               <Ionicons name="cube" size={14} color="#94A3B8" style={{ marginRight: 6 }} />
               <Text style={styles.detailsText}>{displayCount} {item.quantity_unit || 'portions'} {item.listing_type === 'DONATION' ? '(Total)' : 'available'}</Text>
             </View>
-            <View style={styles.detailItem}>
-              <Ionicons name="time" size={14} color="#94A3B8" style={{ marginRight: 6, marginLeft: 12 }} />
-              <Text style={styles.timeValue}>
-                <CountdownTimer targetDate={item.pickup_end} onExpire={() => onExpire(item.id)} />
-              </Text>
-            </View>
+            {!isExpired && item.donor_status !== 'Picked Up' && (
+              <View style={styles.detailItem}>
+                <Ionicons name="time" size={14} color="#94A3B8" style={{ marginRight: 6, marginLeft: 12 }} />
+                <Text style={styles.timeValue}>
+                  <CountdownTimer targetDate={item.pickup_end} onExpire={() => onExpire && onExpire(item.id)} hideExpired />
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.actionButtons}>
-            {isExpired && item.donor_status === 'Active' ? (
+            {item.donor_status === 'Picked Up' ? (
               <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]} 
-                onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}
-              >
-                <Text style={[styles.actionBtnText, { color: '#34D399' }]}>Reactivate</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={styles.actionBtn} 
-                onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}
-              >
-                <Ionicons name="pencil" size={14} color="#5EEAD4" style={{ marginRight: 6 }} />
-                <Text style={styles.actionBtnText}>Edit</Text>
-              </TouchableOpacity>
-            )}
-            
-            {(isExpired || item.donor_status === 'Picked Up' || item.donor_status !== 'Claimed') && (
-              <TouchableOpacity 
-                style={styles.deleteBtn} 
+                style={[styles.actionBtn, { backgroundColor: 'rgba(225, 29, 72, 0.2)' }]} 
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   onDelete(item.id);
                 }}
               >
-                <Ionicons name="trash" size={16} color="#FDA4AF" />
+                <Ionicons name="trash" size={14} color="#FDA4AF" style={{ marginRight: 6 }} />
+                <Text style={[styles.actionBtnText, { color: '#FDA4AF' }]}>Delete</Text>
               </TouchableOpacity>
+            ) : (
+              <>
+                {isExpired && item.donor_status === 'Active' ? (
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]} 
+                    onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}
+                  >
+                    <Text style={[styles.actionBtnText, { color: '#34D399' }]}>Reactivate</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.actionBtn} 
+                    onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}
+                  >
+                    <Ionicons name="pencil" size={14} color="#5EEAD4" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionBtnText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {(isExpired || item.donor_status !== 'Claimed') && (
+                  <TouchableOpacity 
+                    style={styles.deleteBtn} 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      onDelete(item.id);
+                    }}
+                  >
+                    <Ionicons name="trash" size={16} color="#FDA4AF" />
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
         </View>

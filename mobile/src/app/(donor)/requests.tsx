@@ -13,17 +13,29 @@ import RequestCard from '../../components/RequestCard';
 import AnimatedSearchBar from '../../components/AnimatedSearchBar';
 import AnimatedSegmentControl from '../../components/AnimatedSegmentControl';
 
+let savedRequestsActiveTab: 'NGOs / Shelters' | 'Consumers' = 'NGOs / Shelters';
+
 export default function DonorRequestsScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'NGOs / Shelters' | 'Consumers'>('NGOs / Shelters');
+  const [activeTab, setActiveTabState] = useState<'NGOs / Shelters' | 'Consumers'>(savedRequestsActiveTab);
+
+  const setActiveTab = (tab: 'NGOs / Shelters' | 'Consumers') => {
+    savedRequestsActiveTab = tab;
+    setActiveTabState(tab);
+  };
   const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'SOONEST' | 'FURTHEST'>('LATEST');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       fetchOrders();
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [])
   );
 
@@ -145,25 +157,23 @@ export default function DonorRequestsScreen() {
 
         {/* List Content */}
         {loading ? (
-          <ActivityIndicator size="large" color="#5EEAD4" style={{ marginTop: 60 }} />
-        ) : displayedOrders.length === 0 ? (
-          <MotiView 
-            from={{ opacity: 0, translateY: 20 }}
-            animate={{ opacity: 1, translateY: 0 }}
-            style={styles.emptyContainer}
-          >
-            <Ionicons name="cube-outline" size={48} color="rgba(255,255,255,0.4)" style={{ marginBottom: 16 }} />
-            <Text style={styles.emptyText}>
-              No incoming pickups from {activeTab === 'NGOs / Shelters' ? 'shelters' : 'consumers'}.
-            </Text>
-          </MotiView>
+          <ActivityIndicator size="large" color="#0D9488" style={{ marginTop: 60 }} />
         ) : (
-          <FlatList 
-            data={displayedOrders} 
-            renderItem={renderItem} 
-            keyExtractor={item => item.id.toString()} 
+          <FlatList
+            data={isScreenFocused ? displayedOrders : []}
+            keyExtractor={item => item.id.toString()}
+            renderItem={renderItem}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              isScreenFocused ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="checkmark-done-circle-outline" size={64} color="#475569" />
+                  <Text style={styles.emptyStateTitle}>All Caught Up!</Text>
+                  <Text style={styles.emptyStateSubtitle}>There are no pending requests for this category.</Text>
+                </View>
+              ) : null
+            }
           />
         )}
       </SafeAreaView>
@@ -314,6 +324,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 150, // Clear the pill tab bar
     paddingTop: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    marginTop: 60,
+  },
+  emptyStateTitle: {
+    color: '#F8FAFC',
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 16,
+    letterSpacing: 0.5,
+  },
+  emptyStateSubtitle: {
+    color: '#94A3B8',
+    fontSize: 15,
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 22,
   },
   modalOverlay: { 
     flex: 1, 

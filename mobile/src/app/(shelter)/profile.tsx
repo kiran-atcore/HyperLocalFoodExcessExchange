@@ -1,22 +1,36 @@
 import React, { useContext, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { AuthContext } from '../../context/AuthContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
+import * as SecureStore from 'expo-secure-store';
 import { router, useFocusEffect } from 'expo-router';
+
 import api from '../../utils/api';
 import MiniMap from '../../components/MiniMap';
-import * as SecureStore from 'expo-secure-store';
+import ProfileCard from '../../components/ProfileCard';
+import ComboButton from '../../components/ComboButton';
+import { AuthContext } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 
 export default function ShelterProfileScreen() {
   const { logout } = useContext(AuthContext);
+  const { showAlert } = useAlert();
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState({ active: 0, completed: 0 });
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       fetchData();
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [])
   );
 
@@ -27,36 +41,46 @@ export default function ShelterProfileScreen() {
 
       const [userRes, ordersRes] = await Promise.all([
         api.get('/users/me/'),
-        api.get('/orders/')
+        api.get('/orders/'),
       ]);
       setProfile(userRes.data);
-      
-      const orders = ordersRes.data;
-      const active = orders.filter((o: any) => o.status === 'PENDING' || o.status === 'APPROVED').length;
+
+      const orders = ordersRes.data || [];
+      const active = orders.filter(
+        (o: any) => o.status === 'PENDING' || o.status === 'APPROVED'
+      ).length;
       const completed = orders.filter((o: any) => o.status === 'PICKED_UP').length;
       setStats({ active, completed });
     } catch (e) {
-      console.error(e);
+      console.error('Failed to fetch shelter profile data', e);
     }
   };
 
   const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await logout();
       router.replace('/(auth)/login');
     } catch (e) {
-      Alert.alert("Logout failed");
+      Toast.show({
+        type: 'error',
+        text1: 'Logout Failed',
+        text2: 'Could not log out. Please try again.',
+        position: 'top',
+      });
     }
   };
 
   const confirmDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: handleDeleteAccount }
-      ]
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    showAlert(
+      'Delete Account',
+      'Are you sure you want to delete your organization account? This action cannot be undone.',
+      'error',
+      handleDeleteAccount,
+      'Delete',
+      true,
+      'Cancel'
     );
   };
 
@@ -67,131 +91,312 @@ export default function ShelterProfileScreen() {
       await logout(true);
       router.replace('/(auth)/login');
     } catch (e) {
-      Alert.alert("Failed to delete account");
+      Toast.show({
+        type: 'error',
+        text1: 'Deletion Failed',
+        text2: 'Could not delete organization account.',
+        position: 'top',
+      });
       setIsDeleting(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.headerTitle}>Organization Profile</Text>
+    <View style={styles.container}>
+      {/* Master Dark Teal Gradient Background */}
+      <LinearGradient
+        colors={['#042F2E', '#d9dfe9ff']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
 
-        <View style={styles.profileHeader}>
-          <View style={styles.avatarPlaceholder}>
-            {profile?.profile_picture ? (
-              <Image source={{ uri: profile.profile_picture }} style={styles.avatarImage} />
-            ) : (
-              <Ionicons name="business" size={40} color="#3b82f6" />
-            )}
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.name}>{profile?.business_name || profile?.first_name || 'Loading...'}</Text>
-            {profile?.first_name && <Text style={styles.ownerName}>Manager: {profile.first_name}</Text>}
-            <Text style={styles.email}>{profile?.email || 'Loading...'}</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>Verified Shelter</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/(forms)/edit-shelter-profile/me' as any)}>
-            <Ionicons name="create-outline" size={20} color="#64748b" />
-          </TouchableOpacity>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Header */}
+        <View style={styles.heroHeader}>
+          <Text style={styles.heroTitle}>Organization Profile</Text>
+          <Text style={styles.heroSubtitle}>Manage your shelter credentials & logistics</Text>
         </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.completed}</Text>
-            <Text style={styles.statLabel}>Total Rescued</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{stats.active}</Text>
-            <Text style={styles.statLabel}>Active Claims</Text>
-          </View>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {isScreenFocused && (
+            <>
+              {/* Profile Card */}
+              <ProfileCard
+                profile={profile}
+                editRoute="/(forms)/edit-shelter-profile/me"
+                tagText="Verified Shelter"
+                icon="business"
+              />
 
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Organization</Text>
-          
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(views)/tax-docs' as any)}>
-            <View style={styles.menuItemLeft}>
-              <Ionicons name="document-text-outline" size={22} color="#64748b" />
-              <Text style={styles.menuItemText}>Tax Exemption Docs</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#cbd5e1" />
-          </TouchableOpacity>
+              {/* Stats Bento Tiles */}
+              <MotiView
+                from={{ opacity: 0, translateY: 20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'spring', delay: 100 }}
+                style={styles.statsRow}
+              >
+                <View style={styles.statTile}>
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                  />
+                  <View style={styles.statIconBadge}>
+                    <Ionicons name="gift-outline" size={20} color="#10B981" />
+                  </View>
+                  <Text style={styles.statValue}>{stats.completed}</Text>
+                  <Text style={styles.statLabel}>Total Rescued</Text>
+                </View>
 
+                <View style={styles.statTile}>
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                  />
+                  <View style={[styles.statIconBadge, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
+                    <Ionicons name="time-outline" size={20} color="#38BDF8" />
+                  </View>
+                  <Text style={[styles.statValue, { color: '#38BDF8' }]}>{stats.active}</Text>
+                  <Text style={styles.statLabel}>Active Pickups</Text>
+                </View>
+              </MotiView>
 
-        </View>
+              {/* Organization Section / Tax Docs */}
+              <MotiView
+                from={{ opacity: 0, translateY: 20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'spring', delay: 150 }}
+                style={styles.sectionContainer}
+              >
+                <Text style={styles.sectionTitle}>ORGANIZATION</Text>
 
-        {profile?.address && profile?.latitude && profile?.longitude && (
-          <View style={styles.locationSection}>
-            <Text style={styles.sectionTitle}>Default Location</Text>
-            <View style={styles.locationCard}>
-              <View style={styles.addressRow}>
-                <Ionicons name="location-sharp" size={20} color="#3b82f6" style={styles.locationIcon} />
-                <Text style={styles.addressText}>{profile.address}</Text>
-              </View>
-              <View style={styles.miniMapContainer}>
-                <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
-              </View>
-            </View>
-          </View>
-        )}
+                <TouchableOpacity
+                  style={styles.actionCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    router.push('/(views)/tax-docs' as any);
+                  }}
+                >
+                  <LinearGradient
+                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                  />
+                  <View style={styles.actionCardLeft}>
+                    <View style={styles.actionIconWrapper}>
+                      <Ionicons name="document-text-outline" size={22} color="#5EEAD4" />
+                    </View>
+                    <View>
+                      <Text style={styles.actionTitle}>Tax Exemption Docs</Text>
+                      <Text style={styles.actionSubtitle}>View 80G & 501(c)(3) certifications</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
+                </TouchableOpacity>
+              </MotiView>
 
-        <View style={styles.bottomButtons}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="#ef4444" />
-            <Text style={styles.logoutText}>Log Out</Text>
-          </TouchableOpacity>
+              {/* Location Section */}
+              {profile?.address && profile?.latitude && profile?.longitude && (
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'spring', delay: 200 }}
+                  style={styles.sectionContainer}
+                >
+                  <Text style={styles.sectionTitle}>DEFAULT LOCATION</Text>
 
-          <TouchableOpacity style={[styles.logoutButton, { marginTop: 12, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#ef4444' }]} onPress={confirmDeleteAccount} disabled={isDeleting}>
-            <Ionicons name="trash-outline" size={22} color="#ef4444" />
-            <Text style={styles.logoutText}>{isDeleting ? 'Deleting...' : 'Delete Account'}</Text>
-          </TouchableOpacity>
-        </View>
+                  <View style={styles.locationCard}>
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.06)', 'rgba(255, 255, 255, 0.01)']}
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    />
 
-      </ScrollView>
-    </SafeAreaView>
+                    <View style={styles.addressRow}>
+                      <View style={styles.locationIconWrapper}>
+                        <Ionicons name="location" size={20} color="#5EEAD4" />
+                      </View>
+                      <Text style={styles.addressText} numberOfLines={2}>
+                        {profile.address}
+                      </Text>
+                    </View>
+
+                    <View style={styles.miniMapContainer}>
+                      <MiniMap latitude={profile.latitude} longitude={profile.longitude} />
+                    </View>
+                  </View>
+                </MotiView>
+              )}
+
+              {/* Logout & Delete Actions */}
+              <ComboButton
+                onLogout={handleLogout}
+                onDelete={confirmDeleteAccount}
+                isDeleting={isDeleting}
+              />
+            </>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  scrollContent: { paddingHorizontal: 16, paddingBottom: 40, flexGrow: 1 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginVertical: 16 },
-  
-  profileHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', padding: 16, borderRadius: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, position: 'relative' },
-  editProfileBtn: { position: 'absolute', top: 12, right: 12, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 20, zIndex: 10, elevation: 3 },
-  avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#eff6ff', marginRight: 16, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImage: { width: '100%', height: '100%' },
-  profileInfo: { flex: 1 },
-  name: { fontSize: 20, fontWeight: 'bold', color: '#1e293b', marginBottom: 2 },
-  ownerName: { fontSize: 13, color: '#475569', fontWeight: '500', marginBottom: 4 },
-  email: { fontSize: 14, color: '#64748b', marginBottom: 8 },
-  badge: { backgroundColor: '#dbeafe', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 12, fontWeight: 'bold', color: '#1e40af' },
+  container: {
+    flex: 1,
+    backgroundColor: '#042F2E',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  heroHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
 
-  statsContainer: { flexDirection: 'row', backgroundColor: '#ffffff', borderRadius: 16, paddingVertical: 16, marginBottom: 24, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  statBox: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 20, fontWeight: 'bold', color: '#3b82f6', marginBottom: 4 },
-  statLabel: { fontSize: 12, color: '#64748b', fontWeight: '500' },
-  statDivider: { width: 1, backgroundColor: '#e2e8f0', marginVertical: 8 },
+  // Stats Bento
+  statsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  statTile: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
+    overflow: 'hidden',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#10B981',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '600',
+  },
 
-  menuSection: { marginBottom: 32 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1e293b', marginBottom: 12, marginLeft: 4 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#ffffff', padding: 16, borderRadius: 12, marginBottom: 8, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 1 },
-  menuItemLeft: { flexDirection: 'row', alignItems: 'center' },
-  menuItemText: { fontSize: 15, color: '#334155', marginLeft: 12, fontWeight: '500' },
+  // Section
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  actionCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  actionCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  actionIconWrapper: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(94, 234, 212, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  actionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  actionSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
 
-  locationSection: { marginBottom: 32 },
-  locationCard: { backgroundColor: '#ffffff', borderRadius: 16, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, overflow: 'hidden' },
-  addressRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  locationIcon: { marginRight: 8 },
-  addressText: { fontSize: 15, color: '#334155', flex: 1, fontWeight: '500' },
-  miniMapContainer: { height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#e2e8f0' },
-
-  bottomButtons: { marginTop: 'auto', paddingTop: 24 },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fee2e2', padding: 16, borderRadius: 12 },
-  logoutText: { fontSize: 16, fontWeight: 'bold', color: '#ef4444', marginLeft: 8 }
+  // Location Card
+  locationCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
+    overflow: 'hidden',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  locationIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(94, 234, 212, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addressText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#E2E8F0',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  miniMapContainer: {
+    height: 160,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
 });

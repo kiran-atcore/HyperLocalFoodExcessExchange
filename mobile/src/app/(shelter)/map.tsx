@@ -1,14 +1,17 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator, TextInput, TouchableOpacity, Keyboard, Platform, Alert } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Keyboard, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useFocusEffect, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
 import { generateMapPinCardHtml } from '../../components/MapPinCard';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
+import AnimatedSearchBar from '../../components/AnimatedSearchBar';
 
 export default function ShelterMapScreen() {
   const [donations, setDonations] = useState<any[]>([]);
@@ -85,7 +88,12 @@ export default function ShelterMapScreen() {
         eta, 
         quantity: etaModalListing.listing_type === 'DISCOUNT' ? quantity : undefined 
       });
-      Alert.alert("Success", "Successfully claimed!");
+      Toast.show({
+        type: 'success',
+        text1: 'Successfully Claimed!',
+        text2: 'Your pickup reservation is confirmed.',
+        position: 'top',
+      });
       fetchDonations(); // refresh map data
       if (etaModalListing.listing_type === 'DISCOUNT') {
         router.push(`/(views)/receipt/${response.data.id}` as any);
@@ -93,7 +101,12 @@ export default function ShelterMapScreen() {
         router.push(`/(views)/claim/${response.data.id}` as any);
       }
     } catch (e: any) {
-      Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim donation.");
+      Toast.show({
+        type: 'error',
+        text1: 'Claim Failed',
+        text2: e.response?.data?.error || 'Unable to claim donation.',
+        position: 'top',
+      });
     }
   };
 
@@ -177,7 +190,24 @@ export default function ShelterMapScreen() {
       <style>
         body { padding: 0; margin: 0; }
         html, body, #map { height: 100%; width: 100vw; }
-        .leaflet-popup-content-wrapper { border-radius: 12px; }
+        .leaflet-popup-content-wrapper {
+          background: #0F172A;
+          color: #F8FAFC;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+          padding: 2px;
+        }
+        .leaflet-popup-tip {
+          background: #0F172A;
+          border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .leaflet-container a.leaflet-popup-close-button {
+          color: #94A3B8;
+          top: 8px;
+          right: 8px;
+          font-size: 16px;
+        }
       </style>
     </head>
     <body>
@@ -293,59 +323,129 @@ export default function ShelterMapScreen() {
   `;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search food items (e.g. burgers)..."
-            value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              if (text === '') setFilteredDonations(donations);
-            }}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Top Header & Search Bar */}
+        <View style={styles.topHeader}>
+          <LinearGradient
+            colors={['#042F2E', 'rgba(4, 47, 46, 0.95)', 'rgba(4, 47, 46, 0.8)']}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           />
-        </View>
-      </View>
+          <View style={styles.headerTitleRow}>
+            <View>
+              <Text style={styles.heroTitle}>Radar Map</Text>
+              <Text style={styles.heroSubtitle}>Live excess food pins around you</Text>
+            </View>
+            <View style={styles.radarBadge}>
+              <Ionicons name="location" size={20} color="#5EEAD4" />
+            </View>
+          </View>
 
-      {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color="#3b82f6" />
+          <View style={{ marginTop: 12 }}>
+            <AnimatedSearchBar
+              value={searchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                if (text === '') setFilteredDonations(donations);
+              }}
+              placeholder="Search surplus on radar..."
+              variant="dark"
+            />
+          </View>
         </View>
-      ) : (
-        <WebView
-          ref={webViewRef}
-          originWhitelist={['*']}
-          source={{ html: leafletHtml }}
-          style={styles.map}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          onMessage={handleWebViewMessage}
-        />
-      )}
 
-      {etaModalListing && (
-        <EtaSelectionModal 
-          visible={!!etaModalListing} 
-          onClose={() => setEtaModalListing(null)} 
-          onConfirm={submitClaim} 
-          pickupEnd={etaModalListing.pickup_end}
-          showQuantity={etaModalListing.listing_type === 'DISCOUNT'}
-          maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
-        />
-      )}
-    </SafeAreaView>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#0D9488" />
+            <Text style={styles.loadingText}>Scanning radar for surplus...</Text>
+          </View>
+        ) : (
+          <WebView
+            ref={webViewRef}
+            originWhitelist={['*']}
+            source={{ html: leafletHtml }}
+            style={styles.map}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            onMessage={handleWebViewMessage}
+          />
+        )}
+
+        {etaModalListing && (
+          <EtaSelectionModal
+            visible={!!etaModalListing}
+            onClose={() => setEtaModalListing(null)}
+            onConfirm={submitClaim}
+            pickupEnd={etaModalListing.pickup_end}
+            showQuantity={etaModalListing.listing_type === 'DISCOUNT'}
+            maxQuantity={
+              etaModalListing.quantity_remaining !== undefined
+                ? etaModalListing.quantity_remaining
+                : etaModalListing.quantity_available
+            }
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
-  searchContainer: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', zIndex: 10 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f1f5f9', borderRadius: 12, paddingHorizontal: 12, height: 44 },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 16, color: '#0f172a' },
-  map: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#042F2E',
+  },
+  safeArea: {
+    flex: 1,
+  },
+  topHeader: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: 10,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  radarBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(13, 148, 136, 0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(94, 234, 212, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  map: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#042F2E',
+  },
+  loadingText: {
+    marginTop: 14,
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

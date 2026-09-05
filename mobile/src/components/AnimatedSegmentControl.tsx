@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, TouchableOpacity, StyleSheet, LayoutChangeEvent, Text } from 'react-native';
-import { MotiView } from 'moti';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 interface AnimatedSegmentControlProps {
@@ -18,7 +19,7 @@ export default function AnimatedSegmentControl({
 }: AnimatedSegmentControlProps) {
   const [containerWidth, setContainerWidth] = useState(0);
 
-  const activeIndex = tabs.indexOf(activeTab);
+  const activeIndex = Math.max(0, tabs.indexOf(activeTab));
   const isDark = variant === 'dark';
 
   // Premium, airy color palette
@@ -32,6 +33,39 @@ export default function AnimatedSegmentControl({
   const PADDING = 8;
   const tabWidth = containerWidth > 0 ? (containerWidth - (PADDING * 2)) / tabs.length : 0;
 
+  const translateX = useSharedValue(0);
+  const isInitialized = useRef(false);
+
+  // Sync position on activeIndex or tabWidth change
+  useEffect(() => {
+    if (tabWidth > 0) {
+      const targetX = activeIndex * tabWidth;
+      if (!isInitialized.current) {
+        translateX.value = targetX;
+        isInitialized.current = true;
+      } else {
+        translateX.value = withSpring(targetX, {
+          damping: 24,
+          stiffness: 250,
+          mass: 0.8
+        });
+      }
+    }
+  }, [activeIndex, tabWidth]);
+
+  // Force-sync immediately on screen focus to prevent native unfreeze transform desync
+  useFocusEffect(
+    useCallback(() => {
+      if (tabWidth > 0) {
+        translateX.value = activeIndex * tabWidth;
+      }
+    }, [activeIndex, tabWidth])
+  );
+
+  const animatedIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
   return (
     <View
       style={[
@@ -42,27 +76,22 @@ export default function AnimatedSegmentControl({
         }
       ]}
       onLayout={(e: LayoutChangeEvent) => {
-        setContainerWidth(e.nativeEvent.layout.width);
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - containerWidth) > 0.5) {
+          setContainerWidth(w);
+        }
       }}
     >
       {tabWidth > 0 && (
-        <MotiView
+        <Animated.View
           style={[
             styles.activeBackground,
             {
               width: tabWidth,
               backgroundColor: activeBgColor,
-            }
+            },
+            animatedIndicatorStyle,
           ]}
-          animate={{
-            translateX: activeIndex * tabWidth,
-          }}
-          transition={{
-            type: 'spring',
-            damping: 24,
-            stiffness: 250,
-            mass: 0.8
-          }}
         />
       )}
 
@@ -74,8 +103,15 @@ export default function AnimatedSegmentControl({
             style={styles.tab}
             activeOpacity={0.7}
             onPress={() => {
+              Haptics.selectionAsync();
+              if (tabWidth > 0) {
+                translateX.value = withSpring(index * tabWidth, {
+                  damping: 24,
+                  stiffness: 250,
+                  mass: 0.8
+                });
+              }
               if (!isActive) {
-                Haptics.selectionAsync();
                 onChange(tab);
               }
             }}

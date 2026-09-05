@@ -15,6 +15,9 @@ interface AlertModalProps {
   type?: AlertType;
   onClose: () => void;
   confirmText?: string;
+  showCancel?: boolean;
+  cancelText?: string;
+  onConfirm?: () => void;
 }
 
 export default function AlertModal({ 
@@ -23,7 +26,10 @@ export default function AlertModal({
   message, 
   type = 'info', 
   onClose, 
-  confirmText = 'OK' 
+  confirmText = 'OK',
+  showCancel = false,
+  cancelText = 'Cancel',
+  onConfirm
 }: AlertModalProps) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -72,7 +78,7 @@ export default function AlertModal({
     }
   }, [visible]);
 
-  if (!visible && fadeAnim._value === 0) return null;
+  if (!visible && (fadeAnim as any)._value === 0) return null;
 
   const getIconConfig = () => {
     switch (type) {
@@ -117,16 +123,23 @@ export default function AlertModal({
               <Text style={styles.title}>{title}</Text>
               <Text style={styles.message}>{message}</Text>
 
-              <TouchableOpacity activeOpacity={0.8} style={styles.button} onPress={onClose}>
-                <LinearGradient
-                  colors={[iconConfig.color, iconConfig.color + 'CC']}
-                  style={styles.buttonGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <Text style={styles.buttonText}>{confirmText}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+              <View style={showCancel ? styles.buttonsRow : styles.buttonWrapper}>
+                {showCancel && (
+                  <TouchableOpacity activeOpacity={0.8} style={styles.cancelButton} onPress={onClose}>
+                    <Text style={styles.cancelButtonText}>{cancelText}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity activeOpacity={0.8} style={[styles.button, showCancel && { flex: 1 }]} onPress={onConfirm || onClose}>
+                  <LinearGradient
+                    colors={[iconConfig.color, iconConfig.color + 'CC']}
+                    style={styles.buttonGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Text style={styles.buttonText}>{confirmText}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </LinearGradient>
         </Animated.View>
@@ -197,6 +210,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 32,
+  },
+  buttonWrapper: {
+    width: '100%',
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+  },
+  cancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#94A3B8',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   button: {
     width: '100%',

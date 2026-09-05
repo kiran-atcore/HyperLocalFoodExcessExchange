@@ -152,6 +152,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.listing.donor != request.user:
             return Response({'error': 'Not authorized.'}, status=status.HTTP_403_FORBIDDEN)
             
+        expected_order_id = request.data.get('expected_order_id')
+        if expected_order_id and str(order.id) != str(expected_order_id):
+            return Response({'error': 'The scanned QR code does not match this specific pickup request.'}, status=status.HTTP_400_BAD_REQUEST)
+
         from django.utils import timezone
         
         if order.status not in [OrderStatus.PICKED_UP, OrderStatus.CANCELLED, OrderStatus.EXPIRED]:
@@ -206,7 +210,10 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.cancelled_by = request.user
         order.save()
 
-        return Response({'status': 'Order cancelled successfully.'})
+        return Response({
+            'status': 'Order cancelled successfully.',
+            'order': self.get_serializer(order).data
+        })
 
     @action(detail=True, methods=['patch'])
     def expire(self, request, pk=None):

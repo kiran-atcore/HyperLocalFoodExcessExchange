@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { MotiView } from 'moti';
 
-export default function CountdownTimer({ targetDate, onExpire }: { targetDate: string | null, onExpire?: () => void }) {
+export default function CountdownTimer({ 
+  targetDate, 
+  onExpire,
+  hideExpired = false
+}: { 
+  targetDate: string | null; 
+  onExpire?: () => void;
+  hideExpired?: boolean;
+}) {
   const [timeLeft, setTimeLeft] = useState('');
   const [isUrgent, setIsUrgent] = useState(false);
   const hasExpiredRef = useRef(false);
@@ -52,6 +60,10 @@ export default function CountdownTimer({ targetDate, onExpire }: { targetDate: s
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [targetDate]);
+
+  if (hideExpired && timeLeft === 'Expired') {
+    return null;
+  }
 
   return (
     <MotiView

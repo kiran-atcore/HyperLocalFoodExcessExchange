@@ -8,6 +8,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
+import * as Sharing from 'expo-sharing';
+import Toast from 'react-native-toast-message';
 import api from '../../utils/api';
 import RecentReceiptCard from '../../components/RecentReceiptCard';
 
@@ -18,10 +20,15 @@ export default function DonorTaxScreen() {
   const [endDate, setEndDate] = useState(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
+      setIsScreenFocused(true);
       fetchReceipts();
+      return () => {
+        setIsScreenFocused(false);
+      };
     }, [])
   );
 
@@ -52,7 +59,12 @@ export default function DonorTaxScreen() {
   const handleExport = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (displayedReceipts.length === 0) {
-      Alert.alert('No Receipts', 'You have no tax receipts to download for this period.');
+      Toast.show({
+        type: 'error',
+        text1: 'No Receipts',
+        text2: 'You have no tax receipts to download for this period.',
+        position: 'top',
+      });
       return;
     }
 
@@ -70,14 +82,28 @@ export default function DonorTaxScreen() {
       const fileUri = `${FileSystem.documentDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
 
-      Alert.alert(
-        'Download Successful',
-        `Your CSV has been downloaded to:\n${fileUri}`
-      );
-
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: 'text/csv',
+          dialogTitle: 'Export Tax Receipt',
+          UTI: 'public.comma-separated-values-text'
+        });
+      } else {
+        Toast.show({
+          type: 'success',
+          text1: 'Download Successful',
+          text2: `Your CSV has been downloaded to internal storage.`,
+          position: 'top',
+        });
+      }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to generate tax receipt CSV.');
+      Toast.show({
+        type: 'error',
+        text1: 'Export Error',
+        text2: 'Failed to generate tax receipt CSV.',
+        position: 'top',
+      });
     }
   };
 
@@ -103,102 +129,105 @@ export default function DonorTaxScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-          {/* Dashboard Summary Card */}
-          <MotiView
-            from={{ opacity: 0, translateY: 20, scale: 0.95 }}
-            animate={{ opacity: 1, translateY: 0, scale: 1 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 100 }}
-            style={styles.summaryCard}
-          >
-            <LinearGradient
-              colors={['#0F766E', '#042F2E']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-
-            <LinearGradient
-              colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.4)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
-
-            <View style={styles.summaryTopRow}>
-              <View style={styles.iconContainer}>
-                <Ionicons name="leaf" size={20} color="#5EEAD4" />
-              </View>
-              <Text style={styles.summaryLabel}>APPROVED VALUE</Text>
-            </View>
-
-            <Text style={styles.summaryValue}>₹{totalValue}</Text>
-
-            <View style={styles.dateFilterContainer}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.dateBtn}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setShowStartPicker(true);
-                }}
+          {isScreenFocused && (
+            <>
+              {/* Dashboard Summary Card */}
+              <MotiView
+                from={{ opacity: 0, translateY: 20, scale: 0.95 }}
+                animate={{ opacity: 1, translateY: 0, scale: 1 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                style={styles.summaryCard}
               >
-                <Ionicons name="calendar" size={14} color="#94A3B8" />
-                <Text style={styles.dateBtnText}>{startDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-              </TouchableOpacity>
+                <LinearGradient
+                  colors={['#0F766E', '#042F2E']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
 
-              <Ionicons name="arrow-forward" size={14} color="#64748B" style={{ marginHorizontal: 8 }} />
+                <LinearGradient
+                  colors={['rgba(0,0,0,0.0)', 'rgba(0,0,0,0.4)']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                style={styles.dateBtn}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setShowEndPicker(true);
-                }}
+                <View style={styles.summaryTopRow}>
+                  <View style={styles.iconContainer}>
+                    <Ionicons name="leaf" size={20} color="#5EEAD4" />
+                  </View>
+                  <Text style={styles.summaryLabel}>APPROVED VALUE</Text>
+                </View>
+
+                <Text style={styles.summaryValue}>₹{totalValue}</Text>
+
+                <View style={styles.dateFilterContainer}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.dateBtn}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setShowStartPicker(true);
+                    }}
+                  >
+                    <Ionicons name="calendar" size={14} color="#94A3B8" />
+                    <Text style={styles.dateBtnText}>{startDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  </TouchableOpacity>
+
+                  <Ionicons name="arrow-forward" size={14} color="#64748B" style={{ marginHorizontal: 8 }} />
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.dateBtn}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setShowEndPicker(true);
+                    }}
+                  >
+                    <Ionicons name="calendar" size={14} color="#94A3B8" />
+                    <Text style={styles.dateBtnText}>{endDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
+                  </TouchableOpacity>
+                </View>
+              </MotiView>
+
+              {/* Export Button */}
+              <MotiView
+                from={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', delay: 100 }}
+                style={styles.exportWrapper}
               >
-                <Ionicons name="calendar" size={14} color="#94A3B8" />
-                <Text style={styles.dateBtnText}>{endDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
-              </TouchableOpacity>
-            </View>
-          </MotiView>
+                <TouchableOpacity activeOpacity={0.8} style={styles.exportBtn} onPress={handleExport}>
+                  <LinearGradient
+                    colors={['#0D9488', '#0F766E']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <Ionicons name="cloud-download-outline" size={22} color="#FFFFFF" style={{ marginRight: 10 }} />
+                  <Text style={styles.exportBtnText}>Download CSV Statement</Text>
+                </TouchableOpacity>
+              </MotiView>
 
-          {/* Export Button */}
-          <MotiView
-            from={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: 'spring', delay: 100 }}
-            style={styles.exportWrapper}
-          >
-            <TouchableOpacity activeOpacity={0.8} style={styles.exportBtn} onPress={handleExport}>
-              <LinearGradient
-                colors={['#0D9488', '#0F766E']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Ionicons name="cloud-download-outline" size={22} color="#FFFFFF" style={{ marginRight: 10 }} />
-              <Text style={styles.exportBtnText}>Download CSV Statement</Text>
-            </TouchableOpacity>
-          </MotiView>
+              <Text style={styles.sectionTitle}>Recent Receipts</Text>
 
-          <Text style={styles.sectionTitle}>Recent Receipts</Text>
-
-          {loading ? (
-            <ActivityIndicator size="large" color="#5EEAD4" style={{ marginTop: 40 }} />
-          ) : displayedReceipts.length === 0 ? (
-            <MotiView
-              from={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={styles.emptyContainer}
-            >
-              <Ionicons name="receipt-outline" size={48} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
-              <Text style={styles.emptyText}>No tax receipts in this period.</Text>
-            </MotiView>
-          ) : (
-            displayedReceipts.map((receipt, index) => (
-              <RecentReceiptCard key={receipt.id} receipt={receipt} index={index} />
-            ))
+              {loading ? (
+                <ActivityIndicator size="large" color="#5EEAD4" style={{ marginTop: 40 }} />
+              ) : displayedReceipts.length === 0 ? (
+                <MotiView
+                  from={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={styles.emptyContainer}
+                >
+                  <Ionicons name="receipt-outline" size={48} color="rgba(255,255,255,0.2)" style={{ marginBottom: 16 }} />
+                  <Text style={styles.emptyText}>No tax receipts in this period.</Text>
+                </MotiView>
+              ) : (
+                displayedReceipts.map((receipt, index) => (
+                  <RecentReceiptCard key={receipt.id} receipt={receipt} index={index} />
+                ))
+              )}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>

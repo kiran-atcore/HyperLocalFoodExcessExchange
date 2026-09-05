@@ -221,7 +221,7 @@ export default function RegisterScreen() {
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
         <LinearGradient
-          colors={['#0F766E', '#0D9488']}
+          colors={['#042F2E', '#0F766E']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
@@ -413,7 +413,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D9488',
+    backgroundColor: '#042F2E',
   },
   blob1: {
     position: 'absolute',
