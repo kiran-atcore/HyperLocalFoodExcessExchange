@@ -236,7 +236,7 @@ export default function LoginScreen() {
         return;
       }
 
-      const redirectUri = Linking.createURL('/');
+      const redirectUri = 'https://hyperlocalfoodexcessexchange.onrender.com/api/users/google-callback/';
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
       )}&redirect_uri=${encodeURIComponent(
@@ -245,7 +245,7 @@ export default function LoginScreen() {
         'openid email profile'
       )}&nonce=${Math.random().toString(36).substring(7)}`;
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, 'mobile://');
 
       if (result.type === 'success' && result.url) {
         const hash = result.url.split('#')[1] || '';

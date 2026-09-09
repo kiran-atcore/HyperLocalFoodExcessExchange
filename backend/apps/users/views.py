@@ -1,6 +1,7 @@
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.http import HttpResponse
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -415,3 +416,33 @@ class GoogleLoginView(APIView):
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'detail': f'Google authentication failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def google_callback_view(request):
+    """
+    Acts as an authorized HTTPS OAuth redirect endpoint for Google.
+    Receives Google's redirect containing tokens/code and immediately hands it back
+    to the mobile app via deep linking (mobile://auth).
+    """
+    html = """<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResQ Authentication</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #042F2E; color: white;">
+    <div style="text-align: center; padding: 24px;">
+        <h2 style="margin-bottom: 8px; font-weight: 700;">Redirecting to ResQ...</h2>
+        <p style="color: #94A3B8; font-size: 14px;">Completing your secure Google sign-in</p>
+    </div>
+    <script>
+        (function() {
+            var hash = window.location.hash ? window.location.hash.substring(1) : '';
+            var search = window.location.search ? window.location.search.substring(1) : '';
+            var params = hash || search;
+            window.location.replace("mobile://auth?" + params);
+        })();
+    </script>
+</body>
+</html>"""
+    return HttpResponse(html, content_type="text/html")
