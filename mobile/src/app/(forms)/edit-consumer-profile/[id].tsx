@@ -196,7 +196,11 @@ export default function EditConsumerProfileScreen() {
         };
         await api.patch('/users/me/', payload);
         showAlert("Updated", "Your profile has been updated.", "success", () => {
-          router.back();
+          if (params.fromSignup === 'true' || id === 'new') {
+            router.replace('/');
+          } else {
+            router.back();
+          }
         });
       }
     } catch (e: any) {

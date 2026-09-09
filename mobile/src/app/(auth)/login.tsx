@@ -222,12 +222,49 @@ export default function LoginScreen() {
     }).start();
   };
 
-  const handleRoleSelected = (selectedRole: UserRole) => {
+  const [pendingGoogleToken, setPendingGoogleToken] = useState<string | null>(null);
+
+  const handleRoleSelected = async (selectedRole: UserRole) => {
     setIsGoogleModalOpen(false);
-    handleGoogleSignIn(selectedRole);
+    if (!pendingGoogleToken) return;
+
+    setIsGoogleLoading(true);
+    try {
+      const response = await api.post('/users/google-login/', { token: pendingGoogleToken, role: selectedRole, action: 'login' });
+      await login(response.data.access, response.data.refresh);
+      
+      const isNewUser = response.data.is_new_user;
+      const user = response.data.user;
+      const userId = String(user?.id || 'new');
+
+      Toast.show({
+        type: 'success',
+        text1: 'Account Created!',
+        text2: 'Please complete your profile to finish setup.',
+      });
+
+      if (user?.role === 'donor') {
+        router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { id: userId, fromSignup: 'true' } });
+      } else if (user?.role === 'shelter') {
+        router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { id: userId, fromSignup: 'true' } });
+      } else {
+        router.replace({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { id: userId, fromSignup: 'true' } });
+      }
+    } catch (err: any) {
+      const isRoleConflict = err.response?.data?.role_conflict;
+      Toast.show({
+        type: 'error',
+        text1: isRoleConflict ? 'Account Role Conflict' : 'Google Sign-In Error',
+        text2: err.response?.data?.detail || err.message || 'Authentication failed',
+        visibilityTime: 6000,
+      });
+    } finally {
+      setIsGoogleLoading(false);
+      setPendingGoogleToken(null);
+    }
   };
 
-  const handleGoogleSignIn = async (role: UserRole = 'consumer') => {
+  const handleGoogleSignIn = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGoogleLoading(true);
     setErrorMsg('');
@@ -250,9 +287,9 @@ export default function LoginScreen() {
         redirectUri
       )}&response_type=token%20id_token&scope=${encodeURIComponent(
         'openid email profile'
-      )}&nonce=${Math.random().toString(36).substring(7)}`;
+      )}&prompt=select_account&nonce=${Math.random().toString(36).substring(7)}`;
 
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, 'mobile://');
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, 'mobile://auth');
 
       if (result.type === 'success' && result.url) {
         const hash = result.url.split('#')[1] || '';
@@ -261,28 +298,15 @@ export default function LoginScreen() {
         const token = params.get('access_token') || params.get('id_token');
 
         if (token) {
-          const response = await api.post('/users/google-login/', { token, role });
-          await login(response.data.access, response.data.refresh);
+          // Check if user exists first
+          const checkResponse = await api.post('/users/google-login/', { token, action: 'check' });
           
-          const isNewUser = response.data.is_new_user;
-          const user = response.data.user;
-          const userId = String(user?.id || 'new');
-
-          if (isNewUser) {
-            Toast.show({
-              type: 'success',
-              text1: 'Account Created!',
-              text2: 'Please complete your profile to finish setup.',
-            });
-
-            if (user?.role === 'donor') {
-              router.push({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { id: userId } });
-            } else if (user?.role === 'shelter') {
-              router.push({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { id: userId } });
-            } else {
-              router.push({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { id: userId } });
-            }
+          if (checkResponse.data.is_new_user) {
+            setPendingGoogleToken(token);
+            setIsGoogleModalOpen(true);
           } else {
+            // User exists, tokens are returned
+            await login(checkResponse.data.access, checkResponse.data.refresh);
             Toast.show({
               type: 'success',
               text1: 'Welcome back!',
@@ -299,10 +323,12 @@ export default function LoginScreen() {
         }
       }
     } catch (err: any) {
+      const isRoleConflict = err.response?.data?.role_conflict;
       Toast.show({
         type: 'error',
-        text1: 'Google Sign-In Error',
+        text1: isRoleConflict ? 'Account Role Conflict' : 'Google Sign-In Error',
         text2: err.response?.data?.detail || err.message || 'Authentication failed',
+        visibilityTime: 6000,
       });
     } finally {
       setIsGoogleLoading(false);

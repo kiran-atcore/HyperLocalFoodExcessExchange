@@ -363,7 +363,8 @@ class GoogleLoginView(APIView):
 
     def post(self, request):
         token = request.data.get('token')
-        selected_role = request.data.get('role', RoleType.CONSUMER)
+        action = request.data.get('action', 'login')
+        selected_role = request.data.get('role')
         if not token:
             return Response({'detail': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -397,6 +398,10 @@ class GoogleLoginView(APIView):
 
             if not user:
                 is_new_user = True
+                
+                if action == 'check':
+                    return Response({'is_new_user': True}, status=status.HTTP_200_OK)
+
                 valid_roles = [RoleType.CONSUMER, RoleType.DONOR, RoleType.SHELTER]
                 assigned_role = selected_role if selected_role in valid_roles else RoleType.CONSUMER
                 is_approved = True if assigned_role == RoleType.CONSUMER else False
@@ -416,6 +421,20 @@ class GoogleLoginView(APIView):
                     type="user",
                     related_user=user
                 )
+            else:
+                if selected_role and user.role != selected_role:
+                    role_names = {
+                        RoleType.CONSUMER: 'Consumer',
+                        RoleType.DONOR: 'Kitchen',
+                        RoleType.SHELTER: 'Shelter',
+                        'admin': 'Admin'
+                    }
+                    existing_role_str = role_names.get(user.role, user.role.title())
+                    selected_role_str = role_names.get(selected_role, selected_role.title())
+                    return Response({
+                        'role_conflict': True,
+                        'detail': f'This Google account is already registered as a {existing_role_str}. Please select {existing_role_str} to sign in.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
 
             refresh = RefreshToken.for_user(user)
             return Response({
