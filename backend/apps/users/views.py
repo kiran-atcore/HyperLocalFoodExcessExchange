@@ -12,9 +12,12 @@ from datetime import timedelta
 from django.db.models import Sum, Q
 from apps.listings.models import FoodListing
 from apps.orders.models import Order
-
+from django.core.mail import send_mail
+from django.conf import settings
+import random
+import secrets
 import requests
-from .models import ActivityLog, RoleType
+from .models import ActivityLog, RoleType, EmailOTP
 
 User = get_user_model()
 
@@ -475,3 +478,193 @@ def google_callback_view(request):
 </body>
 </html>"""
     return HttpResponse(html, content_type="text/html")
+
+
+class SendOTPView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        purpose = request.data.get('purpose', '').strip()
+
+        if not email or '@' not in email:
+            return Response({'detail': 'Please provide a valid email address.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if purpose not in ['registration', 'password_reset']:
+            return Response({'detail': 'Invalid purpose specified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user_exists = User.objects.filter(email__iexact=email).exists()
+
+        if purpose == 'registration' and user_exists:
+            return Response({'detail': 'This email is already registered. Please log in.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if purpose == 'password_reset' and not user_exists:
+            return Response({'detail': 'No account found with this email address.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1-minute cooldown check
+        last_otp = EmailOTP.objects.filter(email__iexact=email, purpose=purpose).first()
+        if last_otp:
+            time_since = (timezone.now() - last_otp.created_at).total_seconds()
+            if time_since < 60:
+                wait_sec = int(60 - time_since)
+                return Response({'detail': f'Please wait {wait_sec}s before requesting a new code.', 'cooldown_seconds': wait_sec}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        # Generate 6-digit OTP
+        otp_code = f"{random.randint(100000, 999999)}"
+        EmailOTP.objects.create(
+            email=email,
+            otp=otp_code,
+            purpose=purpose,
+            attempts=0,
+            is_verified=False
+        )
+
+        subject = "Your ResQ Verification Code"
+        if purpose == 'password_reset':
+            subject = "ResQ Password Reset Code"
+
+        html_message = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 20px; }}
+            .card {{ max-width: 480px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }}
+            .logo {{ color: #042F2E; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 24px; text-align: center; }}
+            .badge {{ display: inline-block; background: #0D9488; color: white; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 16px; }}
+            .otp-box {{ background: #F0FDFA; border: 2px dashed #0D9488; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0; }}
+            .otp-code {{ font-size: 36px; font-weight: 800; color: #042F2E; letter-spacing: 8px; font-family: monospace; }}
+            .footer {{ text-align: center; color: #94A3B8; font-size: 12px; margin-top: 24px; line-height: 1.5; }}
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="logo">🌿 ResQ</div>
+            <div style="text-align: center;">
+              <span class="badge">Verification Required</span>
+              <h2 style="color: #0F172A; margin: 8px 0 12px; font-size: 20px;">Your 6-Digit Code</h2>
+              <p style="color: #64748B; font-size: 14px; margin: 0;">Use the code below to complete your {'registration' if purpose == 'registration' else 'password reset'}.</p>
+            </div>
+            <div class="otp-box">
+              <div class="otp-code">{otp_code}</div>
+            </div>
+            <p style="color: #E11D48; font-size: 13px; text-align: center; font-weight: 600; margin: 0;">
+              ⏱️ Valid for 4 minutes • Max 3 verification attempts
+            </p>
+            <div class="footer">
+              If you didn't request this code, you can safely ignore this email.<br>
+              © ResQ Hyperlocal Food Excess Exchange
+            </div>
+          </div>
+        </body>
+        </html>
+        """
+
+        try:
+            send_mail(
+                subject=subject,
+                message=f"Your ResQ verification code is: {otp_code}. Valid for 4 minutes.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                html_message=html_message,
+                fail_silently=False
+            )
+        except Exception as e:
+            print(f"Error sending email via Brevo: {e}")
+            return Response({'detail': 'Failed to send verification email. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            'message': 'Verification code sent to your email.',
+            'expires_in_seconds': 240,
+            'can_resend_in_seconds': 60
+        }, status=status.HTTP_200_OK)
+
+
+class VerifyOTPView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        otp = request.data.get('otp', '').strip()
+        purpose = request.data.get('purpose', '').strip()
+
+        if not email or not otp or not purpose:
+            return Response({'detail': 'Email, OTP, and purpose are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        record = EmailOTP.objects.filter(email__iexact=email, purpose=purpose).first()
+        if not record:
+            return Response({'detail': 'No verification code requested for this email.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 4-minute validity
+        if timezone.now() > record.created_at + timedelta(minutes=4):
+            return Response({'detail': 'Verification code has expired. Please request a new one.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if record.is_verified:
+            return Response({'detail': 'This code has already been verified.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if record.attempts >= 3:
+            return Response({'detail': 'Maximum verification attempts exceeded. Please request a new code.', 'attempts_remaining': 0}, status=status.HTTP_400_BAD_REQUEST)
+
+        record.attempts += 1
+        record.save()
+
+        if record.otp != otp:
+            remaining = 3 - record.attempts
+            if remaining > 0:
+                return Response({'detail': f'Incorrect code. {remaining} attempt(s) remaining.', 'attempts_remaining': remaining}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({'detail': 'Maximum verification attempts exceeded. Please request a new code.', 'attempts_remaining': 0}, status=status.HTTP_400_BAD_REQUEST)
+
+        record.is_verified = True
+        reset_token = secrets.token_urlsafe(32)
+        record.reset_token = reset_token
+        record.save()
+
+        return Response({
+            'message': 'Code verified successfully.',
+            'reset_token': reset_token
+        }, status=status.HTTP_200_OK)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        email = request.data.get('email', '').strip().lower()
+        reset_token = request.data.get('reset_token', '').strip()
+        new_password = request.data.get('new_password', '')
+
+        if not email or not reset_token or not new_password:
+            return Response({'detail': 'Email, reset token, and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({'detail': 'Password must be at least 8 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        record = EmailOTP.objects.filter(
+            email__iexact=email,
+            purpose='password_reset',
+            reset_token=reset_token,
+            is_verified=True
+        ).first()
+
+        if not record or timezone.now() > record.created_at + timedelta(minutes=15):
+            return Response({'detail': 'Invalid or expired password reset session. Please request a new OTP.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        record.delete()
+
+        ActivityLog.objects.create(
+            text=f"Password reset for user {user.first_name or user.email}",
+            type="user",
+            related_user=user
+        )
+
+        return Response({'message': 'Password has been reset successfully. Please log in.'}, status=status.HTTP_200_OK)
+

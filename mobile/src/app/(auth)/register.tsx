@@ -8,9 +8,10 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { AuthContext } from '../../context/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
 import InputField from '../../components/InputField';
 import ButtonOne from '../../components/ButtonOne';
+import api from '../../utils/api';
+import Toast from 'react-native-toast-message';
 
 const { width } = Dimensions.get('window');
 
@@ -192,25 +193,39 @@ export default function RegisterScreen() {
     setErrorMsg('');
     setIsLoading(true);
     try {
-      const params = {
-        email: data.email.trim(),
-        password: data.password,
-        role: role
-      };
+      const cleanEmail = data.email.trim().toLowerCase();
 
-      if (role === 'donor') {
-        router.push({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { ...params, id: 'new' } });
-      } else if (role === 'shelter') {
-        router.push({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { ...params, id: 'new' } });
-      } else {
-        router.push({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { ...params, id: 'new' } });
-      }
+      // Send registration OTP
+      await api.post('/users/send-otp/', {
+        email: cleanEmail,
+        purpose: 'registration',
+      });
+
+      Toast.show({
+        type: 'success',
+        text1: 'Verification Code Sent',
+        text2: 'Please enter the 6-digit code sent to your email.',
+        visibilityTime: 4000,
+      });
+
+      router.push({
+        pathname: '/(auth)/otp',
+        params: {
+          email: cleanEmail,
+          password: data.password,
+          role: role,
+          purpose: 'registration',
+        },
+      });
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      if (err.response?.data?.email) {
+      const detail = err.response?.data?.detail;
+      if (err.response?.status === 400 && detail?.toLowerCase().includes('already registered')) {
         setErrorMsg('Email is already in use. Please log in.');
+      } else if (err.response?.status === 429) {
+        setErrorMsg(detail || 'Please wait before requesting another code.');
       } else {
-        setErrorMsg('Registration failed. Please try again.');
+        setErrorMsg(detail || 'Failed to send verification code. Please try again.');
       }
     } finally {
       setIsLoading(false);

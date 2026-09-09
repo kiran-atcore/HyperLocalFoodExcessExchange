@@ -67,3 +67,24 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ['-timestamp']
+
+class EmailOTP(models.Model):
+    PURPOSE_CHOICES = [
+        ('registration', 'Registration'),
+        ('password_reset', 'Password Reset'),
+    ]
+
+    email = models.EmailField()
+    otp = models.CharField(max_length=6)
+    purpose = models.CharField(max_length=30, choices=PURPOSE_CHOICES)
+    attempts = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now=True)
+    is_verified = models.BooleanField(default=False)
+    reset_token = models.CharField(max_length=100, blank=True, null=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.email} - {self.purpose} - {self.otp}"
+

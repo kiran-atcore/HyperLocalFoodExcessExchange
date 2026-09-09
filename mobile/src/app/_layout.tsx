@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
 import { AuthProvider } from '../context/AuthContext';
 import { AlertProvider } from '../context/AlertContext';
 
@@ -23,6 +24,7 @@ export default function RootLayout() {
           <Stack.Screen name="(shelter)" />
           <Stack.Screen name="(admin)" />
         </Stack>
+        <Toast />
       </AlertProvider>
     </AuthProvider>
   );

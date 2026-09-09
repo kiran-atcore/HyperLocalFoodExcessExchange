@@ -3,10 +3,14 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     RegisterView, CustomTokenObtainPairView, DeleteAccountView, 
     LogoutView, UserProfileView, PendingApprovalsView, ApproveUserView, RejectUserView, UserDetailView, ReRequestApprovalView, AdminDashboardStatsView, AdminUserListView, ActivityLogListView, AdminAnalyticsView,
-    GoogleLoginView, google_callback_view
+    GoogleLoginView, google_callback_view,
+    SendOTPView, VerifyOTPView, ResetPasswordView
 )
 
 urlpatterns = [
+    path('send-otp/', SendOTPView.as_view(), name='send_otp'),
+    path('verify-otp/', VerifyOTPView.as_view(), name='verify_otp'),
+    path('reset-password/', ResetPasswordView.as_view(), name='reset_password'),
     path('admin/stats/', AdminDashboardStatsView.as_view(), name='admin_stats'),
     path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin_analytics'),
     path('admin/list/', AdminUserListView.as_view(), name='admin_user_list'),
@@ -15,6 +19,7 @@ urlpatterns = [
     path('login/', CustomTokenObtainPairView.as_view(), name='login'),
     path('google-login/', GoogleLoginView.as_view(), name='google_login'),
     path('google-callback/', google_callback_view, name='google_callback'),
+
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('delete/', DeleteAccountView.as_view(), name='delete_account'),
     path('logout/', LogoutView.as_view(), name='logout'),

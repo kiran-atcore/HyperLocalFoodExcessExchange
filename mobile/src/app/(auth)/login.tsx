@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import InputField from '../../components/InputField';
 import ButtonOne from '../../components/ButtonOne';
 import GoogleModal, { UserRole } from '../../components/GoogleModal';
+import EmailModal from '../../components/EmailModal';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -92,6 +93,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -520,6 +522,18 @@ export default function LoginScreen() {
                         isPassword={true}
                       />
                     </View>
+
+                    <View style={styles.forgotPasswordContainer}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          setIsEmailModalOpen(true);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                      </TouchableOpacity>
+                    </View>
                   </Animated.View>
 
                   <Animated.View style={{ opacity: staggerAnims[2], transform: [{ translateY: staggerAnims[2].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
@@ -583,6 +597,18 @@ export default function LoginScreen() {
           visible={isGoogleModalOpen}
           onClose={() => setIsGoogleModalOpen(false)}
           onSelectRole={handleRoleSelected}
+        />
+
+        {/* Forgot Password Email Modal */}
+        <EmailModal
+          visible={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
+          onSuccess={(resetEmail) => {
+            router.push({
+              pathname: '/(auth)/otp',
+              params: { email: resetEmail, purpose: 'password_reset' },
+            });
+          }}
         />
       </View>
     </TouchableWithoutFeedback>
@@ -750,6 +776,17 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 8,
+  },
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginTop: -2,
+    marginBottom: 16,
+    paddingRight: 4,
+  },
+  forgotPasswordText: {
+    color: '#14B8A6',
+    fontSize: 13,
+    fontWeight: '600',
   },
   inputWrapper: {
     marginBottom: 16,
