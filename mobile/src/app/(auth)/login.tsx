@@ -48,6 +48,44 @@ const schema = yup.object().shape({
   password: yup.string().required('Password is required'),
 });
 
+let serverWarmPromise: Promise<boolean> | null = null;
+let lastServerAwakeTime = 0;
+
+export const ensureServerAwake = async (onSlowWarmup?: () => void): Promise<boolean> => {
+  const now = Date.now();
+  if (lastServerAwakeTime && now - lastServerAwakeTime < 10 * 60 * 1000) {
+    return true;
+  }
+
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  if (onSlowWarmup) {
+    timer = setTimeout(() => {
+      onSlowWarmup();
+    }, 1200);
+  }
+
+  try {
+    if (!serverWarmPromise) {
+      serverWarmPromise = api.get('/health/', { timeout: 45000 }).then(
+        () => {
+          lastServerAwakeTime = Date.now();
+          serverWarmPromise = null;
+          return true;
+        },
+        () => {
+          serverWarmPromise = null;
+          return false;
+        }
+      );
+    }
+    const result = await serverWarmPromise;
+    if (result) lastServerAwakeTime = Date.now();
+    return result;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+};
+
 export default function LoginScreen() {
   const { login } = useContext(AuthContext);
   const [errorMsg, setErrorMsg] = useState('');
@@ -55,6 +93,11 @@ export default function LoginScreen() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Silently pre-warm the backend so it is awake by the time Google OAuth redirects
+    ensureServerAwake().catch(() => {});
+  }, []);
 
   // Entrance Animation Values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -280,6 +323,17 @@ export default function LoginScreen() {
         return;
       }
 
+      // Ensure Render backend is awake BEFORE opening in-app browser
+      // This guarantees Render never displays its cold-start terminal page upon Google redirect
+      await ensureServerAwake(() => {
+        Toast.show({
+          type: 'info',
+          text1: 'Connecting to Server',
+          text2: 'Waking up secure services, one moment...',
+          visibilityTime: 4000,
+        });
+      });
+
       const redirectUri = 'https://hyperlocalfoodexcessexchange.onrender.com/api/users/google-callback/';
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
         clientId
@@ -488,10 +542,7 @@ export default function LoginScreen() {
                       <Animated.View style={{ transform: [{ scale: googleButtonScale }] }}>
                         <TouchableOpacity
                           style={styles.googleCircleButton}
-                          onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            setIsGoogleModalOpen(true);
-                          }}
+                          onPress={handleGoogleSignIn}
                           onPressIn={handleGooglePressIn}
                           onPressOut={handleGooglePressOut}
                           activeOpacity={0.9}

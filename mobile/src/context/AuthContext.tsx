@@ -71,6 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (apiErr) {
           // Ignore API error (e.g. offline), fallback to token claims
         }
+      } else {
+        // Pre-warm backend in background so it is awake by the time the user signs in
+        api.get('/health/', { timeout: 35000 }).catch(() => {});
       }
     } catch (e) {
       console.error('Failed to restore token', e);

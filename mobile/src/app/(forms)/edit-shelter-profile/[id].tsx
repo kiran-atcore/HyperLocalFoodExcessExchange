@@ -317,12 +317,20 @@ export default function EditShelterProfileScreen() {
     );
   };
 
+  const handleBack = () => {
+    if (params.fromSignup === 'true' || !router.canGoBack()) {
+      router.replace('/(auth)/login');
+    } else {
+      router.back();
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar barStyle="light-content" backgroundColor="#042F2E" />
         <View style={styles.headerButtonContainer} pointerEvents="box-none">
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -450,7 +458,7 @@ export default function EditShelterProfileScreen() {
 
         {/* Back button layer above ScrollView */}
         <Animated.View style={[styles.headerButtonContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]} pointerEvents="box-none">
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity style={styles.backBtn} onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
         </Animated.View>

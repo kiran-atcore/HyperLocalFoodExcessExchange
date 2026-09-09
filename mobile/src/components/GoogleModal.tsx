@@ -18,7 +18,7 @@ import Svg, { Path } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
-const GoogleLogo = ({ size = 22 }: { size?: number }) => (
+const GoogleLogo = ({ size = 20 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
     <Path
       fill="#4285F4"
@@ -49,33 +49,43 @@ interface RoleOption {
   gradient: [string, string];
   accentColor: string;
   badge?: string;
+  badgeBg: string;
+  badgeTextColor: string;
 }
 
 const ROLES: RoleOption[] = [
   {
     id: 'consumer',
     title: 'Consumer',
-    subtitle: 'Browse discounted surplus meals and daily food deals nearby.',
-    icon: 'bag-handle-outline',
-    gradient: ['#0D9488', '#0F766E'],
+    subtitle: 'Browse discounted surplus meals & daily food deals nearby.',
+    icon: 'bag-handle',
+    gradient: ['#042F2E', '#0D9488'],
     accentColor: '#0D9488',
     badge: 'Popular',
+    badgeBg: '#CCFBF1',
+    badgeTextColor: '#0F766E',
   },
   {
     id: 'donor',
     title: 'Kitchen / Donor',
     subtitle: 'List surplus food from your kitchen or store and claim tax docs.',
-    icon: 'restaurant-outline',
-    gradient: ['#F59E0B', '#D97706'],
-    accentColor: '#F59E0B',
+    icon: 'restaurant',
+    gradient: ['#D97706', '#F59E0B'],
+    accentColor: '#D97706',
+    badge: 'Business',
+    badgeBg: '#FEF3C7',
+    badgeTextColor: '#B45309',
   },
   {
     id: 'shelter',
     title: 'Shelter / NGO',
     subtitle: 'Claim verified bulk food donations to feed community members.',
-    icon: 'home-outline',
-    gradient: ['#8B5CF6', '#7C3AED'],
-    accentColor: '#8B5CF6',
+    icon: 'home',
+    gradient: ['#6D28D9', '#8B5CF6'],
+    accentColor: '#7C3AED',
+    badge: 'Community',
+    badgeBg: '#EDE9FE',
+    badgeTextColor: '#6D28D9',
   },
 ];
 
@@ -180,78 +190,93 @@ export default function GoogleModal({ visible, onClose, onSelectRole }: GoogleMo
                 },
               ]}
             >
-              {/* Header */}
-              <View style={styles.header}>
-                <View style={styles.headerIconCircle}>
-                  <GoogleLogo size={24} />
-                </View>
-                <View style={styles.headerTextContainer}>
-                  <Text style={styles.title}>Sign in with Google</Text>
-                  <Text style={styles.subtitle}>Select your role to personalize your experience</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.closeBtn}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onClose();
-                  }}
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                >
-                  <Ionicons name="close" size={22} color="#64748B" />
-                </TouchableOpacity>
-              </View>
+              {/* Teal Hero Header Banner */}
+              <LinearGradient
+                colors={['#042F2E', '#0D9488']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.headerBanner}
+              >
+                {/* Top Bar with Google Pill and Close */}
+                <View style={styles.topBar}>
+                  <View style={styles.googlePill}>
+                    <View style={styles.googleLogoContainer}>
+                      <GoogleLogo size={18} />
+                    </View>
+                    <Text style={styles.googlePillText}>Google Sign In</Text>
+                  </View>
 
-              <View style={styles.separator} />
-
-              {/* Roles List */}
-              <View style={styles.rolesContainer}>
-                {ROLES.map((item, index) => (
-                  <Animated.View
-                    key={item.id}
-                    style={{ transform: [{ scale: cardScales[index] }] }}
+                  <TouchableOpacity
+                    style={styles.closeBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      onClose();
+                    }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <TouchableOpacity
-                      style={styles.roleCard}
-                      onPress={() => handleSelect(item.id)}
-                      onPressIn={() => handleCardPressIn(index)}
-                      onPressOut={() => handleCardPressOut(index)}
-                      activeOpacity={0.92}
+                    <Ionicons name="close" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.headerTextContainer}>
+                  <Text style={styles.title}>Select Your Role</Text>
+                  <Text style={styles.subtitle}>Choose how you would like to participate in ResQ</Text>
+                </View>
+              </LinearGradient>
+
+              {/* Roles Body */}
+              <View style={styles.body}>
+                <View style={styles.rolesContainer}>
+                  {ROLES.map((item, index) => (
+                    <Animated.View
+                      key={item.id}
+                      style={{ transform: [{ scale: cardScales[index] }] }}
                     >
-                      <LinearGradient
-                        colors={item.gradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.iconBox}
+                      <TouchableOpacity
+                        style={styles.roleCard}
+                        onPress={() => handleSelect(item.id)}
+                        onPressIn={() => handleCardPressIn(index)}
+                        onPressOut={() => handleCardPressOut(index)}
+                        activeOpacity={0.92}
                       >
-                        <Ionicons name={item.icon} size={22} color="#FFFFFF" />
-                      </LinearGradient>
+                        <LinearGradient
+                          colors={item.gradient}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.iconBox}
+                        >
+                          <Ionicons name={item.icon} size={22} color="#FFFFFF" />
+                        </LinearGradient>
 
-                      <View style={styles.roleContent}>
-                        <View style={styles.roleTitleRow}>
-                          <Text style={styles.roleTitle}>{item.title}</Text>
-                          {item.badge && (
-                            <View style={styles.badge}>
-                              <Text style={styles.badgeText}>{item.badge}</Text>
-                            </View>
-                          )}
+                        <View style={styles.roleContent}>
+                          <View style={styles.roleTitleRow}>
+                            <Text style={styles.roleTitle}>{item.title}</Text>
+                            {item.badge && (
+                              <View style={[styles.badge, { backgroundColor: item.badgeBg }]}>
+                                <Text style={[styles.badgeText, { color: item.badgeTextColor }]}>{item.badge}</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.roleSubtitle}>{item.subtitle}</Text>
                         </View>
-                        <Text style={styles.roleSubtitle}>{item.subtitle}</Text>
-                      </View>
 
-                      <View style={styles.arrowCircle}>
-                        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-                      </View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                ))}
-              </View>
+                        <View style={styles.arrowCircle}>
+                          <Ionicons name="chevron-forward" size={18} color="#0D9488" />
+                        </View>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  ))}
+                </View>
 
-              {/* Note */}
-              <View style={styles.footerNote}>
-                <Ionicons name="shield-checkmark-outline" size={14} color="#0D9488" />
-                <Text style={styles.footerNoteText}>
-                  Your Google profile will be securely connected to ResQ.
-                </Text>
+                {/* Footer Note */}
+                <View style={styles.footerNote}>
+                  <View style={styles.shieldIconContainer}>
+                    <Ionicons name="shield-checkmark" size={15} color="#0D9488" />
+                  </View>
+                  <Text style={styles.footerNoteText}>
+                    Your account role can be updated anytime in settings.
+                  </Text>
+                </View>
               </View>
             </Animated.View>
           </TouchableWithoutFeedback>
@@ -264,70 +289,94 @@ export default function GoogleModal({ visible, onClose, onSelectRole }: GoogleMo
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(4, 47, 46, 0.65)',
+    backgroundColor: 'rgba(4, 47, 46, 0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalCard: {
-    width: Math.min(width - 36, 420),
+    width: Math.min(width - 32, 420),
     backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+    borderRadius: 30,
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
+        shadowColor: '#042F2E',
         shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.2,
-        shadowRadius: 32,
+        shadowOpacity: 0.35,
+        shadowRadius: 30,
       },
       android: {
-        elevation: 12,
+        elevation: 16,
       },
     }),
   },
-  header: {
+  headerBanner: {
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  topBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  headerIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F1F5F9',
+  googlePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  googleLogoContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
-  headerTextContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#042F2E',
-    letterSpacing: -0.3,
-  },
-  subtitle: {
+  googlePillText: {
+    color: '#FFFFFF',
     fontSize: 12.5,
-    color: '#64748B',
-    marginTop: 2,
-    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   closeBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  separator: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginBottom: 16,
+  headerTextContainer: {
+    marginTop: 2,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 4,
+    lineHeight: 18,
+    fontWeight: '400',
+  },
+  body: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
   },
   rolesContainer: {
     gap: 12,
@@ -336,18 +385,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    borderRadius: 18,
+    borderRadius: 20,
     backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   roleContent: {
     flex: 1,
@@ -362,47 +416,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#0F172A',
+    letterSpacing: -0.2,
   },
   badge: {
-    backgroundColor: '#CCFBF1',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   badgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#0F766E',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
   roleSubtitle: {
     fontSize: 12,
     color: '#64748B',
-    lineHeight: 16,
+    lineHeight: 16.5,
   },
   arrowCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   footerNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    backgroundColor: '#F0FDFA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginTop: 18,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    gap: 8,
+  },
+  shieldIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#CCFBF1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   footerNoteText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+    fontSize: 11.5,
+    color: '#0F766E',
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 16,
   },
 });
