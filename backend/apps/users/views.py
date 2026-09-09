@@ -363,6 +363,7 @@ class GoogleLoginView(APIView):
 
     def post(self, request):
         token = request.data.get('token')
+        selected_role = request.data.get('role', RoleType.CONSUMER)
         if not token:
             return Response({'detail': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -392,18 +393,26 @@ class GoogleLoginView(APIView):
             last_name = data.get('family_name', '')
 
             user = User.objects.filter(email=email).first()
+            is_new_user = False
+
             if not user:
+                is_new_user = True
+                valid_roles = [RoleType.CONSUMER, RoleType.DONOR, RoleType.SHELTER]
+                assigned_role = selected_role if selected_role in valid_roles else RoleType.CONSUMER
+                is_approved = True if assigned_role == RoleType.CONSUMER else False
+                approval_status = 'APPROVED' if is_approved else 'PENDING'
+
                 user = User.objects.create_user(
                     email=email,
                     password=None,
-                    role=RoleType.CONSUMER,
+                    role=assigned_role,
                     first_name=first_name,
                     last_name=last_name,
-                    is_approved=True,
-                    approval_status='APPROVED'
+                    is_approved=is_approved,
+                    approval_status=approval_status
                 )
                 ActivityLog.objects.create(
-                    text=f"User {user.first_name or user.email} signed up via Google",
+                    text=f"User {user.first_name or user.email} signed up via Google as {user.role}",
                     type="user",
                     related_user=user
                 )
@@ -412,7 +421,8 @@ class GoogleLoginView(APIView):
             return Response({
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),
-                'user': UserSerializer(user).data
+                'user': UserSerializer(user).data,
+                'is_new_user': is_new_user
             }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'detail': f'Google authentication failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

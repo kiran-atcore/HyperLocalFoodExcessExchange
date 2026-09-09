@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import InputField from '../../components/InputField';
 import ButtonOne from '../../components/ButtonOne';
+import GoogleModal, { UserRole } from '../../components/GoogleModal';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -52,6 +53,7 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Entrance Animation Values
@@ -220,7 +222,12 @@ export default function LoginScreen() {
     }).start();
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleRoleSelected = (selectedRole: UserRole) => {
+    setIsGoogleModalOpen(false);
+    handleGoogleSignIn(selectedRole);
+  };
+
+  const handleGoogleSignIn = async (role: UserRole = 'consumer') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsGoogleLoading(true);
     setErrorMsg('');
@@ -254,14 +261,35 @@ export default function LoginScreen() {
         const token = params.get('access_token') || params.get('id_token');
 
         if (token) {
-          const response = await api.post('/users/google-login/', { token });
+          const response = await api.post('/users/google-login/', { token, role });
           await login(response.data.access, response.data.refresh);
-          Toast.show({
-            type: 'success',
-            text1: 'Welcome!',
-            text2: 'Signed in with Google successfully.',
-          });
-          router.replace('/');
+          
+          const isNewUser = response.data.is_new_user;
+          const user = response.data.user;
+          const userId = String(user?.id || 'new');
+
+          if (isNewUser) {
+            Toast.show({
+              type: 'success',
+              text1: 'Account Created!',
+              text2: 'Please complete your profile to finish setup.',
+            });
+
+            if (user?.role === 'donor') {
+              router.push({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { id: userId } });
+            } else if (user?.role === 'shelter') {
+              router.push({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { id: userId } });
+            } else {
+              router.push({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { id: userId } });
+            }
+          } else {
+            Toast.show({
+              type: 'success',
+              text1: 'Welcome back!',
+              text2: 'Signed in with Google successfully.',
+            });
+            router.replace('/');
+          }
         } else {
           Toast.show({
             type: 'error',
@@ -434,7 +462,10 @@ export default function LoginScreen() {
                       <Animated.View style={{ transform: [{ scale: googleButtonScale }] }}>
                         <TouchableOpacity
                           style={styles.googleCircleButton}
-                          onPress={handleGoogleSignIn}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setIsGoogleModalOpen(true);
+                          }}
                           onPressIn={handleGooglePressIn}
                           onPressOut={handleGooglePressOut}
                           activeOpacity={0.9}
@@ -469,6 +500,13 @@ export default function LoginScreen() {
             </ScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
+
+        {/* Google Role Selection Modal */}
+        <GoogleModal
+          visible={isGoogleModalOpen}
+          onClose={() => setIsGoogleModalOpen(false)}
+          onSelectRole={handleRoleSelected}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
