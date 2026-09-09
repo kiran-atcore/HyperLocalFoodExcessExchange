@@ -24,3 +24,11 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: BREVO_SMTP_LOGIN
+        sync: false
+      - key: BREVO_SMTP_KEY
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
