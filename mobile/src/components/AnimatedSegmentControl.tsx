@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, TouchableOpacity, StyleSheet, LayoutChangeEvent, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, LayoutChangeEvent, Text, Dimensions } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -11,58 +11,67 @@ interface AnimatedSegmentControlProps {
   variant?: 'dark' | 'light';
 }
 
+const PADDING = 5;
+
 export default function AnimatedSegmentControl({
   tabs,
   activeTab,
   onChange,
   variant = 'dark'
 }: AnimatedSegmentControlProps) {
-  const [containerWidth, setContainerWidth] = useState(0);
+  // Pre-calculate immediate default width to eliminate 0-width initial mount state
+  const windowWidth = Dimensions.get('window').width;
+  const initialContainerWidth = Math.max(0, windowWidth - 40);
+  const initialTabWidth = Math.max(0, (initialContainerWidth - PADDING * 2) / tabs.length);
+
+  const [containerWidth, setContainerWidth] = useState(initialContainerWidth);
 
   const activeIndex = Math.max(0, tabs.indexOf(activeTab));
   const isDark = variant === 'dark';
 
-  // Premium, airy color palette
   const containerBgColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9';
   const activeBgColor = isDark ? 'rgba(255, 255, 255, 0.7)' : '#FFFFFF';
 
   const textIdleColor = isDark ? 'rgba(255, 255, 255, 0.8)' : '#64748B';
   const textActiveColor = isDark ? '#0F766E' : '#0F172A';
 
-  // Geometry
-  const PADDING = 8;
-  const tabWidth = containerWidth > 0 ? (containerWidth - (PADDING * 2)) / tabs.length : 0;
+  const tabWidth = containerWidth > 0 ? (containerWidth - PADDING * 2) / tabs.length : initialTabWidth;
 
-  const translateX = useSharedValue(0);
+  // Shared values for UI-thread driven width and position
+  const tabWidthShared = useSharedValue(initialTabWidth);
+  const translateX = useSharedValue(activeIndex * initialTabWidth);
   const isInitialized = useRef(false);
 
-  // Sync position on activeIndex or tabWidth change
+  // Synchronize Reanimated shared values on activeIndex or tabWidth change
   useEffect(() => {
     if (tabWidth > 0) {
+      tabWidthShared.value = tabWidth;
       const targetX = activeIndex * tabWidth;
       if (!isInitialized.current) {
         translateX.value = targetX;
         isInitialized.current = true;
       } else {
         translateX.value = withSpring(targetX, {
-          damping: 24,
-          stiffness: 250,
-          mass: 0.8
+          damping: 26,
+          stiffness: 280,
+          mass: 0.7
         });
       }
     }
   }, [activeIndex, tabWidth]);
 
-  // Force-sync immediately on screen focus to prevent native unfreeze transform desync
+  // Re-sync immediately on screen focus (prevents tab navigation freeze/offset)
   useFocusEffect(
     useCallback(() => {
       if (tabWidth > 0) {
+        tabWidthShared.value = tabWidth;
         translateX.value = activeIndex * tabWidth;
       }
     }, [activeIndex, tabWidth])
   );
 
   const animatedIndicatorStyle = useAnimatedStyle(() => ({
+    width: tabWidthShared.value,
     transform: [{ translateX: translateX.value }],
   }));
 
@@ -79,21 +88,24 @@ export default function AnimatedSegmentControl({
         const w = e.nativeEvent.layout.width;
         if (w > 0 && Math.abs(w - containerWidth) > 0.5) {
           setContainerWidth(w);
+          const newTabW = (w - PADDING * 2) / tabs.length;
+          tabWidthShared.value = newTabW;
+          if (!isInitialized.current) {
+            translateX.value = activeIndex * newTabW;
+            isInitialized.current = true;
+          }
         }
       }}
     >
-      {tabWidth > 0 && (
-        <Animated.View
-          style={[
-            styles.activeBackground,
-            {
-              width: tabWidth,
-              backgroundColor: activeBgColor,
-            },
-            animatedIndicatorStyle,
-          ]}
-        />
-      )}
+      <Animated.View
+        style={[
+          styles.activeBackground,
+          {
+            backgroundColor: activeBgColor,
+          },
+          animatedIndicatorStyle,
+        ]}
+      />
 
       {tabs.map((tab, index) => {
         const isActive = activeTab === tab;
@@ -106,9 +118,9 @@ export default function AnimatedSegmentControl({
               Haptics.selectionAsync();
               if (tabWidth > 0) {
                 translateX.value = withSpring(index * tabWidth, {
-                  damping: 24,
-                  stiffness: 250,
-                  mass: 0.8
+                  damping: 26,
+                  stiffness: 280,
+                  mass: 0.7
                 });
               }
               if (!isActive) {
@@ -124,6 +136,7 @@ export default function AnimatedSegmentControl({
                   fontWeight: isActive ? '700' : '500',
                 }
               ]}
+              numberOfLines={1}
             >
               {tab}
             </Text>
@@ -138,17 +151,17 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     borderRadius: 14,
-    height: 50, // Generous modern touch target height
+    height: 48,
     position: 'relative',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   activeBackground: {
     position: 'absolute',
-    top: 7,
-    bottom: 7,
-    left: 7,
-    borderRadius: 12,
+    top: PADDING,
+    bottom: PADDING,
+    left: PADDING,
+    borderRadius: 10,
   },
   tab: {
     flex: 1,
@@ -157,7 +170,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   tabText: {
-    fontSize: 15,
-    letterSpacing: 1,
+    fontSize: 14,
+    letterSpacing: 0.5,
   },
 });

@@ -18,6 +18,7 @@ class Order(models.Model):
     quantity = models.PositiveIntegerField(default=1)
     eta = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
     cancelled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='cancelled_orders')
     
     class Meta:

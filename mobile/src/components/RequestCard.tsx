@@ -7,8 +7,12 @@ import CountdownTimer from './CountdownTimer';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function RequestCard({ item, index, onExpire }: any) {
-  const isShelter = item.requester_details?.role === 'shelter';
-  
+  const isShelter = item.listing_details?.listing_type === 'DONATION'
+    ? true
+    : item.listing_details?.listing_type === 'DISCOUNT'
+      ? false
+      : (item.requester_details?.role || '').toLowerCase() === 'shelter';
+
   // Neon accents based on role
   const accentColor = isShelter ? '#38BDF8' : '#10B981'; // Light Blue vs Emerald
   const accentBg = isShelter ? 'rgba(56, 189, 248, 0.15)' : 'rgba(16, 185, 129, 0.15)';
@@ -19,7 +23,7 @@ export default function RequestCard({ item, index, onExpire }: any) {
       animate={{ opacity: 1, translateY: 0, scale: 1 }}
       transition={{ type: 'spring', delay: index * 80, damping: 16, stiffness: 120 }}
     >
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.card}
         onPress={() => router.push(`/(views)/request/${item.id}` as any)}
         activeOpacity={0.85}
@@ -28,21 +32,21 @@ export default function RequestCard({ item, index, onExpire }: any) {
           colors={['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
         />
-        
+
         {/* Glow Accent Line */}
         <View style={[styles.accentLine, { backgroundColor: accentColor }]} />
-        
+
         <View style={styles.cardContent}>
           <View style={styles.headerRow}>
             <View style={styles.userCol}>
               <View style={[styles.roleBadge, { backgroundColor: accentBg }]}>
-                <Ionicons 
-                  name={isShelter ? "business" : "person"} 
-                  size={12} 
-                  color={accentColor} 
-                  style={{ marginRight: 4 }} 
+                <Ionicons
+                  name={isShelter ? "business" : "person"}
+                  size={12}
+                  color={accentColor}
+                  style={{ marginRight: 4 }}
                 />
                 <Text style={[styles.roleText, { color: accentColor }]}>
                   {isShelter ? 'NGO' : 'CONSUMER'}

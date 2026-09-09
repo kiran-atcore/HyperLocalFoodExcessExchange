@@ -256,8 +256,8 @@ export default function ApprovalPendingScreen() {
               icon="refresh-outline"
               onPress={handleReRequest}
               isLoading={loading}
-              colors={['#1E3A8A', '#1E40AF']}
-              sheen={false}
+              colors={['#042F2E', '#0D9488']}
+              sheen={true}
               style={{ marginBottom: 16 }}
             />
 

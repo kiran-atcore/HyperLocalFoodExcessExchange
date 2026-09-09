@@ -8,20 +8,52 @@ import * as Haptics from 'expo-haptics';
 import CountdownTimer from './CountdownTimer';
 
 export default function SurplusCard({ item, index, onDelete, onExpire }: any) {
-  const isExpired = item.forceExpired || (item.pickup_end && new Date(item.pickup_end).getTime() <= new Date().getTime());
+  const isDonation = item.listing_type === 'DONATION';
+  const isExpired =
+    Boolean(item.forceExpired) ||
+    Boolean(item.is_expired) ||
+    item.donor_status === 'Expired' ||
+    item.status === 'EXPIRED' ||
+    item.status === 'Expired' ||
+    Boolean(item.pickup_end && new Date(item.pickup_end).getTime() <= Date.now());
   const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
-  const displayCount = item.listing_type === 'DONATION' ? item.quantity_available : remainingCount;
-  const isSoldOut = item.donor_status === 'Claimed' || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
+  const displayCount = isDonation ? item.quantity_available : remainingCount;
+  
+  const isSoldOut = !isDonation && (remainingCount <= 0 || item.donor_status === 'Sold Out');
+  const isClaimed = isDonation && (item.donor_status === 'Claimed' || item.is_claimed);
+  const isPickedUp = isDonation && item.donor_status === 'Picked Up';
+  const isPartiallySold = !isDonation && !isSoldOut && !isExpired && (item.donor_status === 'Partially Sold' || (remainingCount > 0 && remainingCount < item.quantity_available));
 
-  const getStatusColor = () => {
-    if (item.donor_status === 'Claimed') return { bg: 'rgba(253, 230, 138, 0.9)', text: '#92400E', icon: 'checkmark-circle' };
-    if (isExpired && item.donor_status === 'Active') return { bg: 'rgba(254, 202, 202, 0.9)', text: '#991B1B', icon: 'time' };
-    if (item.donor_status === 'Picked Up') return { bg: 'rgba(203, 213, 225, 0.9)', text: '#334155', icon: 'bag-check' };
-    return { bg: 'rgba(153, 246, 228, 0.9)', text: '#115E59', icon: 'radio-button-on' };
+  const getStatusConfig = () => {
+    if (isDonation) {
+      if (isPickedUp) return { bg: 'rgba(203, 213, 225, 0.9)', text: '#334155', icon: 'bag-check' };
+      if (isClaimed) return { bg: 'rgba(253, 230, 138, 0.9)', text: '#92400E', icon: 'checkmark-circle' };
+      if (isExpired) return { bg: 'rgba(254, 202, 202, 0.9)', text: '#991B1B', icon: 'time' };
+      return { bg: 'rgba(153, 246, 228, 0.9)', text: '#115E59', icon: 'radio-button-on' };
+    } else {
+      if (isSoldOut) return { bg: 'rgba(253, 230, 138, 0.9)', text: '#92400E', icon: 'checkmark-circle' };
+      if (isExpired) return { bg: 'rgba(254, 202, 202, 0.9)', text: '#991B1B', icon: 'time' };
+      if (isPartiallySold) return { bg: 'rgba(186, 230, 253, 0.9)', text: '#0284C7', icon: 'pie-chart' };
+      return { bg: 'rgba(153, 246, 228, 0.9)', text: '#115E59', icon: 'radio-button-on' };
+    }
   };
 
-  const statusConfig = getStatusColor();
-  const statusLabel = isExpired && item.donor_status === 'Active' ? 'EXPIRED' : item.donor_status.toUpperCase();
+  const getStatusLabel = () => {
+    if (isDonation) {
+      if (isPickedUp) return 'PICKED UP';
+      if (isClaimed) return 'CLAIMED';
+      if (isExpired) return 'EXPIRED';
+      return 'ACTIVE';
+    } else {
+      if (isSoldOut) return 'SOLD OUT';
+      if (isExpired) return 'EXPIRED';
+      if (isPartiallySold) return 'PARTIALLY SOLD';
+      return 'ACTIVE';
+    }
+  };
+
+  const statusConfig = getStatusConfig();
+  const statusLabel = getStatusLabel();
   const imageUrl = item.food_image || item.image;
 
   return (
@@ -100,7 +132,7 @@ export default function SurplusCard({ item, index, onDelete, onExpire }: any) {
           <View style={styles.divider} />
 
           <View style={styles.actionButtons}>
-            {item.donor_status === 'Picked Up' ? (
+            {isPickedUp || isSoldOut ? (
               <TouchableOpacity 
                 style={[styles.actionBtn, { backgroundColor: 'rgba(225, 29, 72, 0.2)' }]} 
                 onPress={() => {
@@ -113,7 +145,7 @@ export default function SurplusCard({ item, index, onDelete, onExpire }: any) {
               </TouchableOpacity>
             ) : (
               <>
-                {isExpired && item.donor_status === 'Active' ? (
+                {isExpired ? (
                   <TouchableOpacity 
                     style={[styles.actionBtn, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]} 
                     onPress={() => router.push(`/(forms)/edit-surplus/${item.id}` as any)}
@@ -130,7 +162,7 @@ export default function SurplusCard({ item, index, onDelete, onExpire }: any) {
                   </TouchableOpacity>
                 )}
                 
-                {(isExpired || item.donor_status !== 'Claimed') && (
+                {(isExpired || (!isClaimed && !isPartiallySold)) && (
                   <TouchableOpacity 
                     style={styles.deleteBtn} 
                     onPress={() => {

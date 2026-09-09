@@ -35,7 +35,7 @@ export default function ProfileCard({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        
+
         <View style={styles.content}>
           {/* Avatar Area */}
           <View style={styles.avatarWrapper}>
@@ -54,14 +54,14 @@ export default function ProfileCard({
           {/* Profile Details */}
           <View style={styles.infoContainer}>
             <Text style={styles.name} numberOfLines={1}>{profile?.business_name || profile?.first_name || 'Loading...'}</Text>
-            
+
             {profile?.first_name && (
               <View style={styles.detailRow}>
                 <Ionicons name="person" size={12} color="#94A3B8" style={{ marginRight: 6 }} />
                 <Text style={styles.ownerName} numberOfLines={1}>Manager: {profile.first_name}</Text>
               </View>
             )}
-            
+
             <View style={styles.detailRow}>
               <Ionicons name="mail" size={12} color="#94A3B8" style={{ marginRight: 6 }} />
               <Text style={styles.email} numberOfLines={1}>{profile?.email || 'Loading...'}</Text>
@@ -73,9 +73,9 @@ export default function ProfileCard({
           </View>
 
           {/* Edit Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.7}
-            style={styles.editBtn} 
+            style={styles.editBtn}
             onPress={() => {
               Haptics.selectionAsync();
               router.push(editRoute as any);
@@ -119,19 +119,19 @@ const styles = StyleSheet.create({
     marginRight: 16,
     position: 'relative',
   },
-  avatarImage: { 
-    width: 80, 
-    height: 80, 
+  avatarImage: {
+    width: 80,
+    height: 80,
     borderRadius: 40,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)' 
+    borderColor: 'rgba(255,255,255,0.2)'
   },
-  avatarPlaceholder: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    backgroundColor: 'rgba(94, 234, 212, 0.1)', 
-    alignItems: 'center', 
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(94, 234, 212, 0.1)',
+    alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(94, 234, 212, 0.3)',
@@ -147,10 +147,10 @@ const styles = StyleSheet.create({
   infoContainer: {
     flex: 1,
   },
-  name: { 
-    fontSize: 20, 
-    fontWeight: '800', 
-    color: '#FFFFFF', 
+  name: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
     marginBottom: 6,
     letterSpacing: -0.5,
   },
@@ -159,39 +159,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  ownerName: { 
-    fontSize: 13, 
-    color: '#CBD5E1', 
+  ownerName: {
+    fontSize: 13,
+    color: '#CBD5E1',
     fontWeight: '500',
   },
-  email: { 
-    fontSize: 13, 
-    color: '#94A3B8', 
+  email: {
+    fontSize: 13,
+    color: '#94A3B8',
   },
-  tag: { 
-    backgroundColor: 'rgba(16, 185, 129, 0.15)', 
-    alignSelf: 'flex-start', 
-    paddingHorizontal: 10, 
-    paddingVertical: 4, 
+  tag: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 8,
     marginTop: 8,
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.3)',
   },
-  tagText: { 
-    fontSize: 11, 
-    fontWeight: '800', 
+  tagText: {
+    fontSize: 11,
+    fontWeight: '800',
     color: '#34D399',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  editBtn: { 
-    position: 'absolute', 
-    top: 16, 
-    right: 16, 
+  editBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
     width: 36,
     height: 36,
-    borderRadius: 18, 
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

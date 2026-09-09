@@ -7,7 +7,6 @@ import QRCode from 'react-native-qrcode-svg';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import CountdownTimer from './CountdownTimer';
-import ButtonTwo from './ButtonTwo';
 
 export interface ClaimCardProps {
   item: any;
@@ -236,38 +235,22 @@ export default function ClaimCard({
                 )}
               </View>
             )}
-          </View>
-
-          {/* Action Row */}
-          <View style={styles.actionsRow}>
-            <View style={{ flex: 1 }}>
-              <ButtonTwo
-                title={isDiscount ? 'View Receipt' : 'View Claim Pass'}
-                icon={isDiscount ? 'receipt-outline' : 'qr-code-outline'}
-                onPress={handleOpenDetail}
-                colors={
-                  isInactive
-                    ? ['#1E293B', '#0F172A']
-                    : isDiscount
-                    ? ['#FF8A8A', '#FA5252', '#E03131']
-                    : ['#0D9488', '#042F2E']
-                }
-                sheen={!isInactive}
-                contentStyle={{ paddingVertical: 10 }}
-                textStyle={styles.btnText}
-              />
-            </View>
 
             {/* Cancel Button if active */}
             {!isInactive && onCancelClaim && (
               <TouchableOpacity
                 style={styles.cancelBtn}
                 activeOpacity={0.7}
-                onPress={() => onCancelClaim(item.id)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onCancelClaim(item.id);
+                }}
               >
-                <Ionicons name="trash-outline" size={17} color="#EF4444" />
+                <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
               </TouchableOpacity>
             )}
+
+            <Ionicons name="chevron-forward" size={18} color="#64748B" style={{ marginLeft: 6 }} />
           </View>
         </View>
       </TouchableOpacity>
@@ -413,15 +396,14 @@ const styles = StyleSheet.create({
   bottomBentoTile: {
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderRadius: 14,
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   headerInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
   },
   title: {
     fontSize: 15,
@@ -441,6 +423,7 @@ const styles = StyleSheet.create({
   },
   priceContainer: {
     alignItems: 'flex-end',
+    marginRight: 8,
   },
   discountPrice: {
     fontSize: 16,
@@ -452,25 +435,15 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textDecorationLine: 'line-through',
   },
-
-  // Actions Row
-  actionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   cancelBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: 'rgba(239, 68, 68, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  btnText: {
-    fontSize: 13,
-    fontWeight: '700',
+    marginLeft: 6,
   },
 });

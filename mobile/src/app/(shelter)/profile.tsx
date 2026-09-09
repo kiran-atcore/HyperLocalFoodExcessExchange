@@ -12,6 +12,7 @@ import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
 import MiniMap from '../../components/MiniMap';
 import ProfileCard from '../../components/ProfileCard';
+import StatsCard from '../../components/StatsCard';
 import ComboButton from '../../components/ComboButton';
 import { AuthContext } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
@@ -131,70 +132,8 @@ export default function ShelterProfileScreen() {
               />
 
               {/* Stats Bento Tiles */}
-              <MotiView
-                from={{ opacity: 0, translateY: 20 }}
-                animate={{ opacity: 1, translateY: 0 }}
-                transition={{ type: 'spring', delay: 100 }}
-                style={styles.statsRow}
-              >
-                <View style={styles.statTile}>
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                  />
-                  <View style={styles.statIconBadge}>
-                    <Ionicons name="gift-outline" size={20} color="#10B981" />
-                  </View>
-                  <Text style={styles.statValue}>{stats.completed}</Text>
-                  <Text style={styles.statLabel}>Total Rescued</Text>
-                </View>
+              <StatsCard completed={stats.completed} active={stats.active} />
 
-                <View style={styles.statTile}>
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                  />
-                  <View style={[styles.statIconBadge, { backgroundColor: 'rgba(56, 189, 248, 0.15)' }]}>
-                    <Ionicons name="time-outline" size={20} color="#38BDF8" />
-                  </View>
-                  <Text style={[styles.statValue, { color: '#38BDF8' }]}>{stats.active}</Text>
-                  <Text style={styles.statLabel}>Active Pickups</Text>
-                </View>
-              </MotiView>
-
-              {/* Organization Section / Tax Docs */}
-              <MotiView
-                from={{ opacity: 0, translateY: 20 }}
-                animate={{ opacity: 1, translateY: 0 }}
-                transition={{ type: 'spring', delay: 150 }}
-                style={styles.sectionContainer}
-              >
-                <Text style={styles.sectionTitle}>ORGANIZATION</Text>
-
-                <TouchableOpacity
-                  style={styles.actionCard}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    router.push('/(views)/tax-docs' as any);
-                  }}
-                >
-                  <LinearGradient
-                    colors={['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.02)']}
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                  />
-                  <View style={styles.actionCardLeft}>
-                    <View style={styles.actionIconWrapper}>
-                      <Ionicons name="document-text-outline" size={22} color="#5EEAD4" />
-                    </View>
-                    <View>
-                      <Text style={styles.actionTitle}>Tax Exemption Docs</Text>
-                      <Text style={styles.actionSubtitle}>View 80G & 501(c)(3) certifications</Text>
-                    </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-                </TouchableOpacity>
-              </MotiView>
 
               {/* Location Section */}
               {profile?.address && profile?.latitude && profile?.longitude && (
@@ -272,47 +211,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  // Stats Bento
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  statTile: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
-    overflow: 'hidden',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statIconBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#10B981',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-    fontWeight: '600',
-  },
 
   // Section
   sectionContainer: {
@@ -325,41 +223,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 10,
     marginLeft: 4,
-  },
-  actionCard: {
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    overflow: 'hidden',
-  },
-  actionCardLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  actionIconWrapper: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: 'rgba(94, 234, 212, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  actionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-  },
-  actionSubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
   },
 
   // Location Card

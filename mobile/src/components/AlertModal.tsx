@@ -95,7 +95,7 @@ export default function AlertModal({
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+        <BlurView intensity={20} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} tint="dark" />
         
         <Animated.View 
           style={[

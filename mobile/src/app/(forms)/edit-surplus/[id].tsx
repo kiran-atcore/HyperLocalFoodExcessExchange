@@ -148,7 +148,7 @@ export default function EditSurplusScreen() {
       showAlert("Invalid Deadline", "Please set a valid future pickup deadline.", "warning");
       return;
     }
-    if (isDonation && !quantityUnit) {
+    if (!quantityUnit) {
       showAlert("Unit Required", "Please select a quantity unit.", "warning");
       return;
     }
@@ -315,8 +315,54 @@ export default function EditSurplusScreen() {
                 </View>
                 
                 <View style={styles.inputGroup}>
+                  <View style={[styles.labelRow, { marginBottom: 12 }]}>
+                    <Text style={styles.label}>Unit</Text>
+                    <Text style={styles.requiredStar}>*</Text>
+                  </View>
+                  <View style={{ position: 'relative' }}>
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false} 
+                      onScroll={handleUnitScroll}
+                      scrollEventThrottle={16}
+                      contentContainerStyle={{ gap: 10, paddingBottom: 8, paddingRight: 36 }}
+                    >
+                      {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
+                        <TouchableOpacity 
+                          key={u} 
+                          style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} 
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setQuantityUnit(u);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          {quantityUnit === u && <Ionicons name="checkmark-circle" size={14} color="#042F2E" style={{ marginRight: 6 }} />}
+                          <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                    <MotiView 
+                      animate={{ opacity: unitScrollEnd ? 0 : 1 }}
+                      transition={{ type: 'timing', duration: 200 }}
+                      pointerEvents="none" 
+                      style={styles.scrollHintRight}
+                    >
+                      <LinearGradient
+                        colors={['rgba(15, 23, 42, 0)', 'rgba(15, 23, 42, 0.95)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.scrollHintGradient}
+                      >
+                        <Ionicons name="chevron-forward" size={14} color="#5EEAD4" />
+                      </LinearGradient>
+                    </MotiView>
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.label}>Quantity (portions)</Text>
+                    <Text style={styles.label}>Quantity ({quantityUnit})</Text>
                     <Text style={styles.requiredStar}>*</Text>
                   </View>
                   <AnimatedFormInput
@@ -357,54 +403,6 @@ export default function EditSurplusScreen() {
                     onClose={() => setShowDatePicker(false)}
                   />
                 </View>
-
-                {isDonation && (
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.labelRow, { marginBottom: 12 }]}>
-                      <Text style={styles.label}>Unit</Text>
-                      <Text style={styles.requiredStar}>*</Text>
-                    </View>
-                    <View style={{ position: 'relative' }}>
-                      <ScrollView 
-                        horizontal 
-                        showsHorizontalScrollIndicator={false} 
-                        onScroll={handleUnitScroll}
-                        scrollEventThrottle={16}
-                        contentContainerStyle={{ gap: 10, paddingBottom: 8, paddingRight: 36 }}
-                      >
-                        {['portions', 'lbs', 'kgs', 'items', 'boxes'].map(u => (
-                          <TouchableOpacity 
-                            key={u} 
-                            style={[styles.unitBadge, quantityUnit === u && styles.unitBadgeActive]} 
-                            onPress={() => {
-                              Haptics.selectionAsync();
-                              setQuantityUnit(u);
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            {quantityUnit === u && <Ionicons name="checkmark-circle" size={14} color="#042F2E" style={{ marginRight: 6 }} />}
-                            <Text style={[styles.unitBadgeText, quantityUnit === u && styles.unitBadgeTextActive]}>{u}</Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                      <MotiView 
-                        animate={{ opacity: unitScrollEnd ? 0 : 1 }}
-                        transition={{ type: 'timing', duration: 200 }}
-                        pointerEvents="none" 
-                        style={styles.scrollHintRight}
-                      >
-                        <LinearGradient
-                          colors={['rgba(15, 23, 42, 0)', 'rgba(15, 23, 42, 0.95)']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.scrollHintGradient}
-                        >
-                          <Ionicons name="chevron-forward" size={14} color="#5EEAD4" />
-                        </LinearGradient>
-                      </MotiView>
-                    </View>
-                  </View>
-                )}
 
                 <View style={styles.inputGroup}>
                   <View style={[styles.labelRow, { marginBottom: 12 }]}>

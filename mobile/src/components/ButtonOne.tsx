@@ -1,9 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Animated, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 
-interface ButtonOneProps {
+export interface ButtonOneProps {
   title: string;
   onPress: () => void;
   isLoading?: boolean;
@@ -11,6 +11,7 @@ interface ButtonOneProps {
   showArrow?: boolean;
   colors?: readonly [string, string, ...string[]];
   glowColor?: string;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function ButtonOne({
@@ -20,7 +21,8 @@ export default function ButtonOne({
   disabled = false,
   showArrow = false,
   colors = ['#FF8A8A', '#FA5252', '#E03131'],
-  glowColor = '#FF6B6B'
+  glowColor = '#FF6B6B',
+  style,
 }: ButtonOneProps) {
   const btnScaleAnim = useRef(new Animated.Value(1)).current;
   const arrowTranslateX = useRef(new Animated.Value(0)).current;
@@ -50,7 +52,7 @@ export default function ButtonOne({
   };
 
   return (
-    <View style={{ marginTop: 12, position: 'relative' }}>
+    <View style={[{ marginTop: 12, position: 'relative' }, style]}>
       {/* Pulsing Aura Glow Behind Button */}
       <Animated.View style={{
         position: 'absolute',

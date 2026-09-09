@@ -161,7 +161,11 @@ export default function RequestDetailScreen() {
     );
   }
 
-  const isShelter = order.requester_details?.role === 'shelter';
+  const isShelter = order.listing_details?.listing_type === 'DONATION'
+    ? true
+    : order.listing_details?.listing_type === 'DISCOUNT'
+      ? false
+      : (order.requester_details?.role || '').toLowerCase() === 'shelter';
   const isCompleted = order.status === 'PICKED_UP';
   const isTerminated = order.status === 'CANCELLED' || order.status === 'EXPIRED';
   const canAct = !isCompleted && !isTerminated;

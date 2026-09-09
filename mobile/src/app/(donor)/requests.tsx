@@ -62,19 +62,28 @@ export default function DonorRequestsScreen() {
     }
   };
 
+  const isShelterOrder = (order: any): boolean => {
+    if (order.listing_details?.listing_type === 'DONATION') return true;
+    if (order.listing_details?.listing_type === 'DISCOUNT') return false;
+    const role = (order.requester_details?.role || '').toLowerCase();
+    return role === 'shelter';
+  };
+
   const renderItem = ({ item, index }: any) => {
     return <RequestCard item={item} index={index} onExpire={handleAutoExpire} />;
   };
 
-  const displayedOrders = orders
+  const ngoOrders = orders.filter(o => isShelterOrder(o));
+  const consumerOrders = orders.filter(o => !isShelterOrder(o));
+
+  const displayedOrders = (activeTab === 'NGOs / Shelters' ? ngoOrders : consumerOrders)
     .filter(o => {
-      const targetRole = activeTab === 'NGOs / Shelters' ? 'shelter' : 'consumer';
-      const matchesTab = o.requester_details?.role === targetRole;
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = query === '' || 
-        (o.requester_details?.name && o.requester_details.name.toLowerCase().includes(query)) ||
-        (o.listing_details?.title && o.listing_details.title.toLowerCase().includes(query));
-      return matchesTab && matchesSearch;
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+      const name = (o.requester_details?.name || '').toLowerCase();
+      const title = (o.listing_details?.title || '').toLowerCase();
+      const id = o.id ? o.id.toString() : '';
+      return name.includes(query) || title.includes(query) || id.includes(query);
     })
     .sort((a, b) => {
       if (sortFilter === 'SOONEST') {
@@ -106,14 +115,16 @@ export default function DonorRequestsScreen() {
     <View style={styles.container}>
       <LinearGradient
         colors={['#042F2E', '#d9dfe9ff']}
-        style={StyleSheet.absoluteFill}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.heroHeader}>
           <View>
             <Text style={styles.heroTitle}>Incoming Pickups</Text>
-            <Text style={styles.heroSubtitle}>Manage your pending requests</Text>
+            <Text style={styles.heroSubtitle}>
+              {ngoOrders.length} NGO • {consumerOrders.length} Consumer pending
+            </Text>
           </View>
         </View>
 
@@ -161,6 +172,7 @@ export default function DonorRequestsScreen() {
         ) : (
           <FlatList
             data={isScreenFocused ? displayedOrders : []}
+            extraData={activeTab}
             keyExtractor={item => item.id.toString()}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
@@ -170,7 +182,9 @@ export default function DonorRequestsScreen() {
                 <View style={styles.emptyState}>
                   <Ionicons name="checkmark-done-circle-outline" size={64} color="#475569" />
                   <Text style={styles.emptyStateTitle}>All Caught Up!</Text>
-                  <Text style={styles.emptyStateSubtitle}>There are no pending requests for this category.</Text>
+                  <Text style={styles.emptyStateSubtitle}>
+                    There are no pending {activeTab === 'NGOs / Shelters' ? 'NGO / shelter' : 'consumer'} requests.
+                  </Text>
                 </View>
               ) : null
             }

@@ -19,27 +19,27 @@ export const generateMapPinCardHtml = (
 
     const badgeHtml = isDonation
       ? '<span style="font-size: 9px; font-weight: 800; background: rgba(13, 148, 136, 0.22); color: #5EEAD4; border: 1px solid rgba(94, 234, 212, 0.4); padding: 2px 7px; border-radius: 6px; display: inline-block; letter-spacing: 0.4px;">NGO DONATION</span>'
-      : '<span style="font-size: 9px; font-weight: 800; background: rgba(239, 68, 68, 0.22); color: #FA5252; border: 1px solid rgba(250, 82, 82, 0.4); padding: 2px 7px; border-radius: 6px; display: inline-block; letter-spacing: 0.4px;">DISCOUNT SURPLUS</span>';
+      : '<span style="font-size: 9px; font-weight: 800; background: rgba(13, 148, 136, 0.22); color: #5EEAD4; border: 1px solid rgba(94, 234, 212, 0.4); padding: 2px 7px; border-radius: 6px; display: inline-block; letter-spacing: 0.4px;">DISCOUNT SURPLUS</span>';
 
     const buttonText = isClaimed
       ? 'Already Claimed'
       : isDonation
       ? 'Claim for NGO'
-      : 'Buy at Discount';
+      : 'Buy Now';
 
     const buttonGradient = isClaimed
-      ? 'background: #1E293B; color: #64748B; cursor: not-allowed;'
+      ? 'background: #1E293B; color: #64748B; cursor: not-allowed; border: 1px solid rgba(255, 255, 255, 0.08);'
       : isDonation
-      ? 'background: linear-gradient(135deg, #0D9488 0%, #042F2E 100%); color: #FFFFFF; box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);'
-      : 'background: linear-gradient(135deg, #FF8A8A 0%, #FA5252 50%, #E03131 100%); color: #FFFFFF; box-shadow: 0 4px 14px rgba(250, 82, 82, 0.35);';
+      ? 'background: linear-gradient(135deg, #042F2E 0%, #0D9488 100%); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.2);'
+      : 'background: linear-gradient(135deg, #0D9488 0%, #042F2E 100%); color: #FFFFFF; border: 1px solid rgba(94, 234, 212, 0.4); box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);';
 
     const origPrice = Number(item.original_price) || 0;
     const discPrice = Number(item.discounted_price) || 0;
     const displayPrice = isDonation
       ? '<span style="color: #10B981; font-weight: 900; font-size: 15px; letter-spacing: 0.3px;">100% FREE</span>'
-      : `<span style="color: #FA5252; font-weight: 900; font-size: 16px;">₹${discPrice}</span>${
+      : `<span style="color: #5EEAD4; font-weight: 900; font-size: 16px;">₹${discPrice}</span>${
           origPrice > discPrice
-            ? ` <span style="color: #94A3B8; text-decoration: line-through; font-size: 11px; margin-left: 4px;">₹${origPrice}</span>`
+            ? ` <span style="color: #64748B; text-decoration: line-through; font-size: 11px; margin-left: 4px;">₹${origPrice}</span>`
             : ''
         }`;
 

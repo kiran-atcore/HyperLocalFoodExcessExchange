@@ -258,6 +258,32 @@ export default function SurplusDetailScreen() {
   const displayCount = isDonation ? listing.quantity_available : remainingCount;
   const imageUrl = listing.food_image || listing.image;
   const isPickedUp = listing.donor_status === 'Picked Up' || (orders.length > 0 && orders.some(o => o.status === 'PICKED_UP') && !orders.some(o => o.status === 'PENDING' || o.status === 'CONFIRMED'));
+  const isSoldOut = !isDonation && (listing.quantity_remaining !== undefined ? listing.quantity_remaining <= 0 : listing.donor_status === 'Sold Out');
+  const isClaimed = isDonation && (listing.is_claimed || listing.donor_status === 'Claimed' || (orders.length > 0 && orders.some(o => o.status === 'CONFIRMED' || o.status === 'PICKED_UP')));
+  const isListingExpired =
+    Boolean(isExpired) ||
+    Boolean(listing.is_expired) ||
+    listing.donor_status === 'Expired' ||
+    listing.status === 'EXPIRED' ||
+    listing.status === 'Expired' ||
+    Boolean(listing.pickup_end && new Date(listing.pickup_end).getTime() <= Date.now());
+  const isPartiallySold = !isDonation && !isSoldOut && !isListingExpired && !isPickedUp && (listing.donor_status === 'Partially Sold' || (remainingCount < listing.quantity_available && remainingCount > 0));
+
+  const getStatusInfo = () => {
+    if (isDonation) {
+      if (isPickedUp) return { label: 'PICKED UP', color: '#10B981', border: 'rgba(16, 185, 129, 0.35)' };
+      if (isClaimed) return { label: 'CLAIMED', color: '#F59E0B', border: 'rgba(245, 158, 11, 0.35)' };
+      if (isListingExpired) return { label: 'EXPIRED', color: '#F43F5E', border: 'rgba(244, 63, 94, 0.35)' };
+      return { label: 'ACTIVE', color: '#10B981', border: 'rgba(16, 185, 129, 0.35)' };
+    } else {
+      if (isSoldOut) return { label: 'SOLD OUT', color: '#F59E0B', border: 'rgba(245, 158, 11, 0.35)' };
+      if (isListingExpired) return { label: 'EXPIRED', color: '#F43F5E', border: 'rgba(244, 63, 94, 0.35)' };
+      if (isPartiallySold) return { label: 'PARTIALLY SOLD', color: '#38BDF8', border: 'rgba(56, 189, 248, 0.35)' };
+      return { label: 'ACTIVE', color: '#10B981', border: 'rgba(16, 185, 129, 0.35)' };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
 
   // Pricing & Valuation ratios for Visualizer
   const originalP = Number(listing.original_price) || 0;
@@ -303,10 +329,10 @@ export default function SurplusDetailScreen() {
             <View style={styles.headerCenter}>
               {/* Collapsed State: ID and Status Dot */}
               <Animated.View style={[styles.headerPillWrapper, { opacity: headerBadgeOpacity }]}>
-                <View style={styles.headerPill}>
-                  <View style={[styles.statusDot, { backgroundColor: isPickedUp ? '#10B981' : (isExpired ? '#F43F5E' : '#10B981') }]} />
-                  <Text style={styles.headerPillText}>
-                    {isPickedUp ? 'PICKED UP' : (isExpired ? 'EXPIRED' : (listing.donor_status || 'ACTIVE').toUpperCase())}
+                <View style={[styles.headerPill, { borderColor: statusInfo.border }]}>
+                  <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+                  <Text style={[styles.headerPillText, { color: statusInfo.color }]}>
+                    {statusInfo.label}
                   </Text>
                 </View>
                 <Text style={styles.headerSubtitle}>Surplus #{id}</Text>
@@ -946,8 +972,8 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 21,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(94, 234, 212, 0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },

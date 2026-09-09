@@ -1,29 +1,34 @@
 import React, { useCallback, useContext, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
 
 import MiniMap from '../../components/MiniMap';
 import ProfileCard from '../../components/ProfileCard';
+import StatsCard from '../../components/StatsCard';
 import ComboButton from '../../components/ComboButton';
 import { AuthContext } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { router, useFocusEffect } from 'expo-router';
 import api from '../../utils/api';
 import * as SecureStore from 'expo-secure-store';
 
 export default function DonorProfileScreen() {
   const { logout } = useContext(AuthContext);
+  const { showAlert } = useAlert();
   const [isDeleting, setIsDeleting] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [stats, setStats] = useState({ active: 0, completed: 0 });
   const [isScreenFocused, setIsScreenFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       setIsScreenFocused(true);
-      fetchProfile();
+      fetchData();
       
       return () => {
         setIsScreenFocused(false);
@@ -31,15 +36,29 @@ export default function DonorProfileScreen() {
     }, [])
   );
 
-  const fetchProfile = async () => {
+  const fetchData = async () => {
     try {
       const token = await SecureStore.getItemAsync('access_token');
       if (!token) return;
 
-      const response = await api.get('/users/me/');
-      setProfile(response.data);
+      const [userRes, ordersRes] = await Promise.all([
+        api.get('/users/me/'),
+        api.get('/orders/'),
+      ]);
+      setProfile(userRes.data);
+
+      const orders = ordersRes.data || [];
+      const active = orders.filter(
+        (o: any) => o.status === 'PENDING' || o.status === 'APPROVED'
+      ).length;
+      const completed = orders.filter(
+        (o: any) =>
+          o.status === 'PICKED_UP' &&
+          (o.listing_details?.listing_type === 'DONATION' || o.listing_type === 'DONATION')
+      ).length;
+      setStats({ active, completed });
     } catch (e) {
-      console.error(e);
+      console.error('Failed to fetch kitchen profile data', e);
     }
   };
 
@@ -49,19 +68,25 @@ export default function DonorProfileScreen() {
       await logout();
       router.replace('/(auth)/login');
     } catch (e) {
-      Alert.alert("Logout failed");
+      Toast.show({
+        type: 'error',
+        text1: 'Logout Failed',
+        text2: 'Could not log out. Please try again.',
+        position: 'top',
+      });
     }
   };
 
   const confirmDeleteAccount = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your business account? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: handleDeleteAccount }
-      ]
+    showAlert(
+      'Delete Account',
+      'Are you sure you want to delete your business account? This action cannot be undone.',
+      'error',
+      handleDeleteAccount,
+      'Delete',
+      true,
+      'Cancel'
     );
   };
 
@@ -72,7 +97,12 @@ export default function DonorProfileScreen() {
       await logout(true);
       router.replace('/(auth)/login');
     } catch (e) {
-      Alert.alert("Failed to delete account");
+      Toast.show({
+        type: 'error',
+        text1: 'Deletion Failed',
+        text2: 'Could not delete business account.',
+        position: 'top',
+      });
       setIsDeleting(false);
     }
   };
@@ -82,7 +112,7 @@ export default function DonorProfileScreen() {
       {/* Master Dark Teal Gradient Background */}
       <LinearGradient
         colors={['#042F2E', '#d9dfe9ff']}
-        style={StyleSheet.absoluteFill}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -96,6 +126,13 @@ export default function DonorProfileScreen() {
           {isScreenFocused && (
             <>
               <ProfileCard profile={profile} />
+
+              <StatsCard
+                completed={stats.completed}
+                active={stats.active}
+                completedLabel="Total Donated"
+                activeLabel="Active Pickups"
+              />
 
               {profile?.address && profile?.latitude && profile?.longitude && (
                 <MotiView
@@ -111,7 +148,7 @@ export default function DonorProfileScreen() {
                       colors={['rgba(255, 255, 255, 0.05)', 'rgba(255, 255, 255, 0.01)']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={StyleSheet.absoluteFill}
+                      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
                     />
 
                     <View style={styles.addressRow}>

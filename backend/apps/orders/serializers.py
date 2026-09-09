@@ -7,13 +7,14 @@ User = get_user_model()
 
 class SimpleListingSerializer(serializers.ModelSerializer):
     donor_name = serializers.CharField(source='donor.business_name', read_only=True)
+    donor_phone = serializers.CharField(source='donor.phone_number', read_only=True)
     donor_latitude = serializers.FloatField(source='donor.latitude', read_only=True)
     donor_longitude = serializers.FloatField(source='donor.longitude', read_only=True)
     quantity_remaining = serializers.SerializerMethodField()
     
     class Meta:
         model = FoodListing
-        fields = ['id', 'title', 'listing_type', 'quantity_available', 'quantity_remaining', 'quantity_unit', 'latitude', 'longitude', 'donor_name', 'pickup_end', 'donor_latitude', 'donor_longitude', 'estimated_fmv', 'original_price', 'discounted_price']
+        fields = ['id', 'title', 'listing_type', 'quantity_available', 'quantity_remaining', 'quantity_unit', 'latitude', 'longitude', 'donor_name', 'donor_phone', 'pickup_end', 'donor_latitude', 'donor_longitude', 'estimated_fmv', 'original_price', 'discounted_price']
 
     def get_quantity_remaining(self, obj):
         from django.db.models import Sum
@@ -27,7 +28,7 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'name', 'role', 'email', 'profile_picture']
+        fields = ['id', 'name', 'role', 'email', 'phone_number', 'profile_picture']
         
     def get_name(self, obj):
         return obj.business_name if obj.business_name else obj.first_name
@@ -42,10 +43,11 @@ class SimpleUserSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     listing_details = SimpleListingSerializer(source='listing', read_only=True)
+    donor_phone = serializers.CharField(source='listing.donor.phone_number', read_only=True)
     requester_details = SimpleUserSerializer(source='requester', read_only=True)
     cancelled_by_details = SimpleUserSerializer(source='cancelled_by', read_only=True)
 
     class Meta:
         model = Order
-        fields = ['id', 'listing', 'listing_details', 'requester', 'requester_details', 'cancelled_by', 'cancelled_by_details', 'qr_code_id', 'status', 'eta', 'created_at', 'quantity']
+        fields = ['id', 'listing', 'listing_details', 'donor_phone', 'requester', 'requester_details', 'cancelled_by', 'cancelled_by_details', 'qr_code_id', 'status', 'eta', 'created_at', 'quantity']
         read_only_fields = ['status', 'created_at', 'requester', 'cancelled_by', 'qr_code_id', 'quantity']

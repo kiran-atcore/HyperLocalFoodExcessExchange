@@ -25,6 +25,7 @@ class FoodListingSerializer(serializers.ModelSerializer):
     quantity_remaining = serializers.SerializerMethodField()
     donor_status = serializers.SerializerMethodField()
     donor_name = serializers.CharField(source='donor.business_name', read_only=True)
+    donor_phone = serializers.CharField(source='donor.phone_number', read_only=True)
     donor_latitude = serializers.FloatField(source='donor.latitude', read_only=True)
     donor_longitude = serializers.FloatField(source='donor.longitude', read_only=True)
 

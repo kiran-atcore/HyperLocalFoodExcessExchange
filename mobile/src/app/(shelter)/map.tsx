@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, ActivityIndicator, Keyboard, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useFocusEffect, router } from 'expo-router';
@@ -12,6 +12,7 @@ import { sharedLocation } from '../../utils/sharedState';
 import { generateMapPinCardHtml } from '../../components/MapPinCard';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
 import AnimatedSearchBar from '../../components/AnimatedSearchBar';
+import { MotiView } from 'moti';
 
 export default function ShelterMapScreen() {
   const [donations, setDonations] = useState<any[]>([]);
@@ -22,6 +23,7 @@ export default function ShelterMapScreen() {
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
   const webViewRef = useRef<WebView>(null);
+  const isWebViewLoaded = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -117,22 +119,26 @@ export default function ShelterMapScreen() {
         handleClaimPress(data.id);
       } else if (data.type === 'view' && data.id) {
         router.push(`/(views)/deal/${data.id}` as any);
+      } else if (data.type === 'map_ready') {
+        isWebViewLoaded.current = true;
+        updateMapMarkers(filteredDonations);
       }
     } catch (e) {
       console.error('Failed to parse webview message', e);
     }
   };
 
-  const handleSearch = () => {
-    Keyboard.dismiss();
-    const query = searchQuery.trim().toLowerCase();
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    const query = text.trim().toLowerCase();
     if (!query) {
       setFilteredDonations(donations);
       return;
     }
     const filtered = donations.filter(item => 
-      item.title.toLowerCase().includes(query) || 
-      (item.description && item.description.toLowerCase().includes(query))
+      (item.title && item.title.toLowerCase().includes(query)) || 
+      (item.description && item.description.toLowerCase().includes(query)) ||
+      (item.donor_name && item.donor_name.toLowerCase().includes(query))
     );
     setFilteredDonations(filtered);
   };
@@ -150,37 +156,68 @@ export default function ShelterMapScreen() {
     return d < 1 ? '< 1 km away' : `${d.toFixed(1)} km away`;
   };
 
-  // Group listings by latitude and longitude to handle multiple items from the same location
-  const groupedDonations = filteredDonations.reduce((acc, item) => {
-    const lat = item.donor_latitude || item.latitude || 8.5241;
-    const lng = item.donor_longitude || item.longitude || 76.9366;
-    const key = `${lat}_${lng}`.replace(/\./g, '_');
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(item);
-    return acc;
-  }, {} as Record<string, any[]>);
+  const buildMarkersData = useCallback((items: any[]) => {
+    const grouped = items.reduce((acc, item) => {
+      const lat = item.donor_latitude || item.latitude || 8.5241;
+      const lng = item.donor_longitude || item.longitude || 76.9366;
+      const key = `${lat}_${lng}`.replace(/\./g, '_');
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {} as Record<string, any[]>);
 
-  const markersJs = Object.values(groupedDonations).map((group: any) => {
-    // Sort so latest is first
-    const sortedGroup = [...group].sort((a: any, b: any) => b.id - a.id);
-    const first = sortedGroup[0];
-    const targetLat = first.donor_latitude || first.latitude || 8.5241;
-    const targetLng = first.donor_longitude || first.longitude || 76.9366;
-    const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
-    const safeDonor = (first.donor_name || 'Donor').replace(/'/g, "\\'").replace(/\n|\r/g, ' ');
-    const groupId = `${targetLat}_${targetLng}`.replace(/\./g, '_');
+    return Object.values(grouped).map((group: any) => {
+      const sortedGroup = [...group].sort((a: any, b: any) => b.id - a.id);
+      const first = sortedGroup[0];
+      const targetLat = first.donor_latitude || first.latitude || 8.5241;
+      const targetLng = first.donor_longitude || first.longitude || 76.9366;
+      const distStr = userLocation && targetLat && targetLng ? calculateDistance(userLocation.lat, userLocation.lng, targetLat, targetLng) : 'Distance unknown';
+      const safeDonor = (first.donor_name || 'Donor').replace(/'/g, "\\'").replace(/\n|\r/g, ' ');
+      const groupId = `${targetLat}_${targetLng}`.replace(/\./g, '_');
 
-    const popupHtml = generateMapPinCardHtml(sortedGroup, distStr, safeDonor, groupId);
+      const popupHtml = generateMapPinCardHtml(sortedGroup, distStr, safeDonor, groupId);
+
+      const expirations: Record<string, string> = {};
+      sortedGroup.forEach((item) => {
+        if (item.pickup_end) {
+          expirations[item.id] = item.pickup_end;
+        }
+      });
+
+      return {
+        lat: targetLat,
+        lng: targetLng,
+        popupHtml,
+        expirations,
+      };
+    });
+  }, [userLocation]);
+
+  const updateMapMarkers = useCallback((items: any[]) => {
+    if (!webViewRef.current || !isWebViewLoaded.current) return;
+    const data = buildMarkersData(items);
+    const script = `
+      (function() {
+        if (window.renderMarkers) {
+          window.renderMarkers(${JSON.stringify(data)});
+        }
+      })();
+      true;
+    `;
+    webViewRef.current.injectJavaScript(script);
+  }, [buildMarkersData]);
+
+  useEffect(() => {
+    if (isWebViewLoaded.current) {
+      updateMapMarkers(filteredDonations);
+    }
+  }, [filteredDonations, updateMapMarkers]);
+
+  const leafletHtml = useMemo(() => {
+    const initialLat = userLocation ? userLocation.lat : 8.5241;
+    const initialLng = userLocation ? userLocation.lng : 76.9366;
 
     return `
-      var m_${first.id} = L.marker([${targetLat}, ${targetLng}]).addTo(map);
-      mapMarkers[${first.id}] = m_${first.id};
-      ${sortedGroup.map(item => `markerExpirations[${item.id}] = '${item.pickup_end || ''}';`).join(' ')}
-      m_${first.id}.bindPopup(\`${popupHtml.replace(/`/g, '\\`')}\`);
-    `;
-  }).join('\n');
-
-  const leafletHtml = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -223,9 +260,7 @@ export default function ShelterMapScreen() {
         });
         L.Marker.prototype.options.icon = DefaultIcon;
 
-        var initialLat = ${userLocation ? userLocation.lat : 8.5241};
-        var initialLng = ${userLocation ? userLocation.lng : 76.9366};
-        var map = L.map('map', { zoomControl: false }).setView([initialLat, initialLng], 13);
+        var map = L.map('map', { zoomControl: false }).setView([${initialLat}, ${initialLng}], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
           attribution: '© OpenStreetMap © CARTO'
@@ -233,19 +268,32 @@ export default function ShelterMapScreen() {
 
         ${userLocation ? `
         L.circleMarker([${userLocation.lat}, ${userLocation.lng}], {
-          color: '#10b981',
+          color: '#ffffff',
           fillColor: '#10b981',
           fillOpacity: 1,
           radius: 8,
-          weight: 3,
-          color: '#ffffff'
+          weight: 3
         }).addTo(map).bindPopup('<b>You are here</b>');
         ` : ''}
 
-        var mapMarkers = {};
+        var markersLayer = L.layerGroup().addTo(map);
         var markerExpirations = {};
 
-        ${markersJs}
+        window.renderMarkers = function(markersData) {
+          markersLayer.clearLayers();
+          markerExpirations = {};
+          if (!markersData || !Array.isArray(markersData)) return;
+          markersData.forEach(function(group) {
+            var marker = L.marker([group.lat, group.lng]);
+            marker.bindPopup(group.popupHtml);
+            markersLayer.addLayer(marker);
+            if (group.expirations) {
+              for (var id in group.expirations) {
+                markerExpirations[id] = group.expirations[id];
+              }
+            }
+          });
+        };
 
         function setMapLocation(lat, lng) {
           map.setView([lat, lng], 14);
@@ -287,16 +335,16 @@ export default function ShelterMapScreen() {
           var now = new Date().getTime();
           
           for (var id in markerExpirations) {
-             var expires = markerExpirations[id];
-             if (expires) {
-                 var target = new Date(expires).getTime();
-                 if (target - now <= 0) {
-                     var itemContainer = document.getElementById('item_container_' + id);
-                     if (itemContainer) {
-                         itemContainer.style.display = 'none';
-                     }
-                 }
-             }
+            var expires = markerExpirations[id];
+            if (expires) {
+              var target = new Date(expires).getTime();
+              if (target - now <= 0) {
+                var itemContainer = document.getElementById('item_container_' + id);
+                if (itemContainer) {
+                  itemContainer.style.display = 'none';
+                }
+              }
+            }
           }
 
           var timers = document.querySelectorAll('.countdown-timer');
@@ -317,10 +365,15 @@ export default function ShelterMapScreen() {
             }
           });
         }, 1000);
+
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'map_ready' }));
+        }
       </script>
     </body>
     </html>
   `;
+  }, [userLocation?.lat, userLocation?.lng]);
 
   return (
     <View style={styles.container}>
@@ -344,10 +397,7 @@ export default function ShelterMapScreen() {
           <View style={{ marginTop: 12 }}>
             <AnimatedSearchBar
               value={searchQuery}
-              onChangeText={(text) => {
-                setSearchQuery(text);
-                if (text === '') setFilteredDonations(donations);
-              }}
+              onChangeText={handleSearch}
               placeholder="Search surplus on radar..."
               variant="dark"
             />
@@ -368,7 +418,27 @@ export default function ShelterMapScreen() {
             javaScriptEnabled={true}
             domStorageEnabled={true}
             onMessage={handleWebViewMessage}
+            onLoadEnd={() => {
+              isWebViewLoaded.current = true;
+              updateMapMarkers(filteredDonations);
+            }}
           />
+        )}
+
+        {searchQuery.trim().length > 0 && (
+          <View pointerEvents="none" style={styles.resultsBadgeContainer}>
+            <MotiView
+              from={{ opacity: 0, translateY: 12, scale: 0.9 }}
+              animate={{ opacity: 1, translateY: 0, scale: 1 }}
+              transition={{ type: 'spring', damping: 18 }}
+              style={styles.resultsBadge}
+            >
+              <Ionicons name="search" size={13} color="#5EEAD4" style={{ marginRight: 6 }} />
+              <Text style={styles.resultsBadgeText}>
+                {filteredDonations.length === 1 ? '1 result found' : `${filteredDonations.length} results found`}
+              </Text>
+            </MotiView>
+          </View>
         )}
 
         {etaModalListing && (
@@ -447,5 +517,32 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 14,
     fontWeight: '600',
+  },
+  resultsBadgeContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 115 : 102,
+    alignSelf: 'center',
+    zIndex: 99,
+  },
+  resultsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.92)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(94, 234, 212, 0.35)',
+    shadowColor: '#5EEAD4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  resultsBadgeText: {
+    color: '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
 });

@@ -1,10 +1,63 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import api from '../../utils/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import * as SecureStore from 'expo-secure-store';
+import api from '../../utils/api';
+import ReceiptCard from '../../components/ReceiptCard';
+
+const ParticlesBackground = () => {
+  const particles = Array.from({ length: 12 }).map((_, i) => {
+    const size = Math.random() * 4 + 2;
+    return (
+      <MotiView
+        key={i}
+        from={{
+          opacity: 0,
+          translateY: 0,
+          translateX: (Math.random() - 0.5) * 40,
+        }}
+        animate={{
+          opacity: [0, 0.55, 0],
+          translateY: -280 - Math.random() * 180,
+          translateX: (Math.random() - 0.5) * 120,
+        }}
+        transition={{
+          loop: true,
+          type: 'timing',
+          duration: 5000 + Math.random() * 4000,
+          delay: Math.random() * 3000,
+        }}
+        style={{
+          position: 'absolute',
+          bottom: -40,
+          left: `${Math.random() * 100}%`,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#5EEAD4',
+          shadowColor: '#5EEAD4',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.8,
+          shadowRadius: size,
+        }}
+      />
+    );
+  });
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <LinearGradient
+        colors={['#042F2E', '#0B132B', '#021815']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      {particles}
+    </View>
+  );
+};
 
 export default function WalletScreen() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -31,57 +84,87 @@ export default function WalletScreen() {
     }
   };
 
-  const renderItem = ({ item }: any) => {
-    const isRedeemed = item.status === 'PICKED_UP' || item.status === 'CANCELLED' || item.status === 'EXPIRED';
-    
-    return (
-      <TouchableOpacity 
-        style={[styles.card, isRedeemed && styles.cardFaded]} 
-        activeOpacity={0.8} 
-        onPress={() => router.push(`/(views)/receipt/${item.id}` as any)}
-      >
-        <View style={styles.qrContainer}>
-          <QRCode value={item.qr_code_id || item.id.toString()} size={80} color={isRedeemed ? '#cbd5e1' : '#0f172a'} />
-        </View>
-        <View style={styles.details}>
-          <Text style={styles.title}>{item.listing_details?.title || 'Unknown Item'}</Text>
-          <Text style={styles.vendor}>{item.listing_details?.donor_name || 'Vendor'}</Text>
-          <Text style={[styles.status, !isRedeemed ? styles.statusReady : styles.statusRedeemed]}>
-            {item.status.replace('_', ' ')}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderItem = ({ item, index }: { item: any; index: number }) => (
+    <ReceiptCard
+      item={item}
+      index={index}
+      onPress={(order) => router.push(`/(views)/receipt/${order.id}` as any)}
+    />
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Pickup Wallet</Text>
-      {loading ? (
-        <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList 
-          data={orders} 
-          renderItem={renderItem} 
-          keyExtractor={item => item.id.toString()} 
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No pickup passes found.</Text>}
-        />
-      )}
-    </SafeAreaView>
+    <View style={styles.container}>
+      <ParticlesBackground />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Header */}
+        <View style={styles.heroHeader}>
+          <View>
+            <Text style={styles.heroTitle}>Pickup Wallet</Text>
+            <Text style={styles.heroSubtitle}>Your active collection vouchers & digital receipts</Text>
+          </View>
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons name="receipt" size={22} color="#5EEAD4" />
+          </View>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#5EEAD4" style={{ marginTop: 60 }} />
+        ) : (
+          <FlatList 
+            data={orders} 
+            renderItem={renderItem} 
+            keyExtractor={item => item.id.toString()} 
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="ticket-outline" size={56} color="#64748B" />
+                <Text style={styles.emptyTitle}>Wallet is Empty</Text>
+                <Text style={styles.emptySubtitle}>When you purchase surplus meals, your verified claim QR vouchers will appear here.</Text>
+              </View>
+            }
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
-  card: { backgroundColor: '#ffffff', borderRadius: 16, marginBottom: 16, padding: 16, flexDirection: 'row', alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  cardFaded: { opacity: 0.6 },
-  qrContainer: { marginRight: 16, backgroundColor: '#f1f5f9', padding: 8, borderRadius: 8 },
-  details: { flex: 1 },
-  title: { fontSize: 16, fontWeight: 'bold', color: '#1e293b' },
-  vendor: { fontSize: 14, color: '#64748b', marginTop: 4 },
-  status: { marginTop: 8, fontSize: 12, fontWeight: 'bold' },
-  statusReady: { color: '#10b981' },
-  statusRedeemed: { color: '#94a3b8' }
+  container: { flex: 1, backgroundColor: '#021815' },
+  safeArea: { flex: 1 },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: -0.3,
+  },
+  heroSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  avatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(94, 234, 212, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(94, 234, 212, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  list: { paddingHorizontal: 16, paddingBottom: 110 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80, paddingHorizontal: 32 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#F8FAFC', marginTop: 16 },
+  emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginTop: 6, lineHeight: 19 },
 });

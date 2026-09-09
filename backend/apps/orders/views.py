@@ -111,6 +111,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'This claim was cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
 
         order.status = OrderStatus.PICKED_UP
+        order.picked_up_at = timezone.now()
         order.save()
 
         # Generate Tax Receipt if requested by a Shelter and listing is a Donation
@@ -173,6 +174,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'This claim was cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
 
         order.status = OrderStatus.PICKED_UP
+        order.picked_up_at = timezone.now()
         order.save()
 
         if order.requester.role == 'shelter' and order.listing.listing_type == 'DONATION':

@@ -1,22 +1,92 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, DeviceEventEmitter, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator, DeviceEventEmitter, Modal, Platform } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
 import * as Location from 'expo-location';
+import * as SecureStore from 'expo-secure-store';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
+
 import LocationBanner from '../../components/LocationBanner';
 import api from '../../utils/api';
 import { sharedLocation } from '../../utils/sharedState';
 import CountdownTimer from '../../components/CountdownTimer';
 import EtaSelectionModal from '../../components/EtaSelectionModal';
-import * as SecureStore from 'expo-secure-store';
+import DealCard from '../../components/DealCard';
+import AnimatedSearchBar from '../../components/AnimatedSearchBar';
+
+const ParticlesBackground = () => {
+  const particles = Array.from({ length: 12 }).map((_, i) => {
+    const size = Math.random() * 4 + 2;
+    return (
+      <MotiView
+        key={i}
+        from={{
+          opacity: 0,
+          translateY: 0,
+          translateX: (Math.random() - 0.5) * 40,
+        }}
+        animate={{
+          opacity: [0, 0.55, 0],
+          translateY: -280 - Math.random() * 180,
+          translateX: (Math.random() - 0.5) * 120,
+        }}
+        transition={{
+          loop: true,
+          type: 'timing',
+          duration: 5000 + Math.random() * 4000,
+          delay: Math.random() * 3000,
+        }}
+        style={{
+          position: 'absolute',
+          bottom: -40,
+          left: `${Math.random() * 100}%`,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#5EEAD4',
+          shadowColor: '#5EEAD4',
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.8,
+          shadowRadius: size,
+        }}
+      />
+    );
+  });
+
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+      <LinearGradient
+        colors={['#042F2E', '#0B132B', '#021815']}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      {particles}
+    </View>
+  );
+};
 
 export default function ConsumerFeedScreen() {
   const [feed, setFeed] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false); // Initially false, wait for location
+  const [loading, setLoading] = useState(false);
   const [isLocationReady, setIsLocationReady] = useState(false);
   const [location, setLocation] = useState<{lat: number, lng: number} | null>(null);
   const [displayAddress, setDisplayAddress] = useState(sharedLocation.address || '');
   const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP'>('LATEST');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+
+  const getSortLabel = () => {
+    switch (sortFilter) {
+      case 'LATEST': return 'Latest';
+      case 'OLDEST': return 'Oldest';
+      case 'EXPENSIVE': return 'Expensive';
+      case 'CHEAP': return 'Cheap';
+    }
+  };
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
@@ -95,9 +165,8 @@ export default function ConsumerFeedScreen() {
       if (!token) return;
 
       setLoading(true);
-      const [listingsRes, profileRes] = await Promise.all([
+      const [listingsRes] = await Promise.all([
         api.get('/listings/?listing_type=DISCOUNT'),
-        api.get('/users/me/').catch(() => null)
       ]);
       const now = new Date().getTime();
       const activeDeals = listingsRes.data.filter((item: any) => 
@@ -114,7 +183,7 @@ export default function ConsumerFeedScreen() {
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    if (!lat1 || !lon1 || !lat2 || !lon2) return 'Unknown distance';
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 'Nearby';
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -131,82 +200,70 @@ export default function ConsumerFeedScreen() {
     if (!etaModalListing) return;
     const id = etaModalListing.id;
     setEtaModalListing(null);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
       const eta = new Date(Date.now() + etaMins * 60000).toISOString();
       const response = await api.post('/orders/', { listing: id, eta, quantity });
-      Alert.alert("Success", "Deal successfully claimed!");
+      Toast.show({
+        type: 'success',
+        text1: 'Deal Claimed!',
+        text2: 'Voucher generated successfully.',
+      });
       fetchFeed();
       router.push(`/(views)/receipt/${response.data.id}` as any);
     } catch (e: any) {
-      Alert.alert("Claim Failed", e.response?.data?.error || "Unable to claim deal.");
+      Toast.show({
+        type: 'error',
+        text1: 'Claim Failed',
+        text2: e.response?.data?.error || 'Unable to claim deal right now.',
+      });
     }
   };
 
-  const renderItem = ({ item }: any) => {
+  const getDealPrice = (item: any) => Number(item.discounted_price !== undefined ? item.discounted_price : item.original_price) || 0;
+
+  const filteredFeed = feed
+    .filter((item) => {
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+      const title = (item.title || '').toLowerCase();
+      const donor = (item.donor_name || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      return title.includes(query) || donor.includes(query) || desc.includes(query);
+    })
+    .sort((a, b) => {
+      if (sortFilter === 'EXPENSIVE') {
+        return getDealPrice(b) - getDealPrice(a);
+      } else if (sortFilter === 'CHEAP') {
+        return getDealPrice(a) - getDealPrice(b);
+      } else if (sortFilter === 'OLDEST') {
+        return a.id - b.id;
+      } else {
+        return b.id - a.id;
+      }
+    });
+
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
     const targetLat = item.donor_latitude || item.latitude;
     const targetLng = item.donor_longitude || item.longitude;
     const distanceStr = location && targetLat && targetLng 
       ? calculateDistance(location.lat, location.lng, targetLat, targetLng)
-      : 'Distance unknown';
-
-    const origPrice = Number(item.original_price) || 0;
-    const discPrice = Number(item.discounted_price) || 0;
-    let discountPercent = 0;
-    if (origPrice > 0 && discPrice < origPrice) {
-      discountPercent = Math.round(((origPrice - discPrice) / origPrice) * 100);
-    }
-
-    const isClaimed = item.is_claimed || (item.quantity_remaining !== undefined && item.quantity_remaining <= 0);
-    const remainingCount = item.quantity_remaining !== undefined ? item.quantity_remaining : item.quantity_available;
+      : 'Nearby';
 
     return (
-      <TouchableOpacity 
-        style={[styles.card, isClaimed && { opacity: 0.6 }]} 
-        activeOpacity={0.9} 
-        onPress={() => router.push(`/(views)/deal/${item.id}?distance=${encodeURIComponent(distanceStr)}` as any)}
-      >
-        {item.image_url ? (
-           <Image source={{ uri: item.image_url }} style={styles.image} />
-        ) : (
-           <View style={[styles.image, { backgroundColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center' }]}>
-             <Text style={{color: '#94a3b8'}}>No Image</Text>
-           </View>
-        )}
-        
-        {discountPercent > 0 && (
-           <View style={styles.discountBanner}>
-             <Text style={styles.discountBannerText}>{discountPercent}% OFF</Text>
-           </View>
-        )}
-        
-        <View style={styles.cardContent}>
-          <View style={styles.headerRow}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.badgeDiscount}>
-              ${Number(item.discounted_price).toFixed(2)}
-            </Text>
-          </View>
-          <Text style={styles.vendor}>{item.donor_name || 'Vendor'} • {distanceStr}</Text>
-          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
-            <Text style={[styles.originalPrice, { marginBottom: 0 }]}>Original: ${Number(item.original_price).toFixed(2)}</Text>
-            <Text style={{fontSize: 12, color: '#64748b', marginLeft: 6}}>• {remainingCount} left</Text>
-          </View>
-          
-          <View style={styles.footerRow}>
-            <Text style={styles.time}>
-              Expires in: <CountdownTimer targetDate={item.pickup_end} onExpire={() => fetchFeed()} />
-            </Text>
-            <TouchableOpacity 
-              style={[styles.button, isClaimed && { backgroundColor: '#94a3b8' }]} 
-              onPress={() => !isClaimed && setEtaModalListing(item)}
-              disabled={isClaimed}
-            >
-              <Text style={styles.buttonText}>{isClaimed ? 'Sold Out' : 'Buy Now'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
+      <DealCard
+        item={item}
+        distance={distanceStr}
+        index={index}
+        onPress={(dealItem) => {
+          router.push(`/(views)/deal/${dealItem.id}?distance=${encodeURIComponent(distanceStr)}` as any);
+        }}
+        onClaim={(dealItem) => {
+          setEtaModalListing(dealItem);
+        }}
+        onExpire={() => fetchFeed()}
+      />
     );
   };
 
@@ -218,73 +275,349 @@ export default function ConsumerFeedScreen() {
       sharedLocation.lng = lng;
       sharedLocation.address = address;
     }
-    // Set location ready and fetch deals (even if location failed, we load deals anyway without distance)
     setIsLocationReady(true);
     fetchFeed();
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <LocationBanner 
-        address={!isLocationReady ? 'Fetching location...' : displayAddress} 
-        autoFetch={false} 
-        onLocationChange={handleLocationChange} 
-        onMapPress={() => {
-          const lat = location?.lat || sharedLocation.lat || 8.5241;
-          const lng = location?.lng || sharedLocation.lng || 76.9366;
-          router.push(`/(views)/map/picker?lat=${lat}&lng=${lng}` as any);
-        }}
-      />
-      <Text style={styles.header}>Nearby Deals</Text>
-      
-      {!isLocationReady ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 40 }}>
-          <ActivityIndicator size="large" color="#10b981" />
-          <Text style={{ marginTop: 16, color: '#64748b', fontWeight: '500' }}>Locating you...</Text>
+    <View style={styles.container}>
+      <ParticlesBackground />
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        {/* Hero Header */}
+        <View style={styles.heroHeader}>
+          <View>
+            <Text style={styles.heroTitle}>Flash Food Deals</Text>
+            <Text style={styles.heroSubtitle}>Rescue excess kitchen meals with huge discounts</Text>
+          </View>
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons name="flame" size={24} color="#5EEAD4" />
+          </View>
         </View>
-      ) : loading ? (
-        <ActivityIndicator size="large" color="#10b981" style={{ marginTop: 40 }} />
-      ) : (
-        <FlatList 
-          data={feed} 
-          renderItem={renderItem} 
-          keyExtractor={item => item.id.toString()} 
-          contentContainerStyle={styles.list} 
-          showsVerticalScrollIndicator={false} 
-          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#64748b', marginTop: 40 }}>No deals available right now.</Text>}
-        />
-      )}
 
-      {etaModalListing && (
-        <EtaSelectionModal 
-          visible={!!etaModalListing} 
-          onClose={() => setEtaModalListing(null)} 
-          onConfirm={submitBuyNow} 
-          pickupEnd={etaModalListing.pickup_end}
-          showQuantity={true}
-          maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
-        />
-      )}
-    </SafeAreaView>
+        {/* Location Banner */}
+        <View style={styles.bannerContainer}>
+          <LocationBanner 
+            address={!isLocationReady ? 'Acquiring GPS fix...' : displayAddress} 
+            autoFetch={false} 
+            onLocationChange={handleLocationChange} 
+            onMapPress={() => {
+              const lat = location?.lat || sharedLocation.lat || 8.5241;
+              const lng = location?.lng || sharedLocation.lng || 76.9366;
+              router.push(`/(views)/map/picker?lat=${lat}&lng=${lng}` as any);
+            }}
+            variant="dark"
+          />
+        </View>
+
+        {/* Tools Row: Search & Sort Button */}
+        <View style={styles.toolsContainer}>
+          <View style={{ marginBottom: 12 }}>
+            <AnimatedSearchBar
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search deals & kitchens..."
+              variant="dark"
+            />
+          </View>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              style={styles.dropdownButton}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowSortMenu(true);
+              }}
+            >
+              <Ionicons name="filter" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.dropdownButtonText}>
+                {getSortLabel()}
+              </Text>
+              <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {!isLocationReady ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator size="large" color="#5EEAD4" />
+            <Text style={styles.centerText}>Locating nearby kitchens...</Text>
+          </View>
+        ) : loading ? (
+          <ActivityIndicator size="large" color="#5EEAD4" style={{ marginTop: 40 }} />
+        ) : (
+          <FlatList 
+            data={filteredFeed} 
+            renderItem={renderItem} 
+            keyExtractor={item => item.id.toString()} 
+            contentContainerStyle={styles.list} 
+            showsVerticalScrollIndicator={false} 
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Ionicons name="restaurant-outline" size={54} color="#64748B" />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? 'No Matching Deals' : 'No Live Deals Right Now'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {searchQuery 
+                    ? 'Try searching with a different keyword or clearing the filter.' 
+                    : 'All surplus portions in your area have been claimed. Check back shortly!'}
+                </Text>
+              </View>
+            }
+          />
+        )}
+
+        {etaModalListing && (
+          <EtaSelectionModal
+            visible={!!etaModalListing}
+            onClose={() => setEtaModalListing(null)}
+            onConfirm={submitBuyNow}
+            pickupEnd={etaModalListing.pickup_end}
+            showQuantity={true}
+            maxQuantity={etaModalListing.quantity_remaining !== undefined ? etaModalListing.quantity_remaining : etaModalListing.quantity_available}
+          />
+        )}
+
+        {/* Glassmorphic Sort Modal */}
+        <Modal visible={showSortMenu} transparent={true} animationType="fade">
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity 
+              style={StyleSheet.absoluteFill} 
+              activeOpacity={1} 
+              onPress={() => setShowSortMenu(false)}
+            />
+            <MotiView 
+              from={{ translateY: 400, scale: 0.9, opacity: 0 }}
+              animate={{ translateY: 0, scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 150 }}
+              style={styles.menuWrapper}
+            >
+              <LinearGradient
+                colors={['rgba(15, 23, 42, 0.95)', 'rgba(2, 6, 23, 0.95)']}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.menuInnerGlow} />
+
+              <View style={styles.menuContainer}>
+                <View style={styles.dragIndicator} />
+                <Text style={styles.menuTitle}>Sort Deals</Text>
+                
+                <View style={styles.optionsGrid}>
+                  {[
+                    { id: 'LATEST', label: 'Latest', sub: 'Newest first', icon: 'time' },
+                    { id: 'OLDEST', label: 'Oldest', sub: 'Oldest first', icon: 'time-outline' },
+                    { id: 'EXPENSIVE', label: 'Expensive', sub: 'Highest price first', icon: 'trending-up' },
+                    { id: 'CHEAP', label: 'Cheap', sub: 'Lowest price first', icon: 'trending-down' }
+                  ].map((option, index) => {
+                    const isActive = sortFilter === option.id;
+                    return (
+                      <MotiView
+                        key={option.id}
+                        from={{ opacity: 0, translateY: 15 }}
+                        animate={{ opacity: 1, translateY: 0 }}
+                        transition={{ type: 'spring', delay: index * 100 }}
+                        style={{ width: '100%', marginBottom: 12 }}
+                      >
+                        <TouchableOpacity 
+                          activeOpacity={0.8}
+                          style={[styles.menuOptionBlock, isActive && styles.menuOptionBlockActive]} 
+                          onPress={() => { 
+                            Haptics.selectionAsync();
+                            setSortFilter(option.id as any); 
+                            setTimeout(() => setShowSortMenu(false), 200);
+                          }}
+                        >
+                          {isActive && (
+                            <LinearGradient
+                              colors={['rgba(13, 148, 136, 0.8)', 'rgba(15, 118, 110, 0.9)']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+                          )}
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                              <Ionicons name={option.icon as any} size={20} color={isActive ? '#FFFFFF' : '#94A3B8'} />
+                            </View>
+                            <View>
+                              <Text style={[styles.menuOptionTitle, isActive && styles.menuOptionTitleActive]}>{option.label}</Text>
+                              <Text style={[styles.menuOptionSub, isActive && styles.menuOptionSubActive]}>{option.sub}</Text>
+                            </View>
+                          </View>
+                          {isActive && (
+                            <MotiView from={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
+                              <Ionicons name="checkmark-circle" size={28} color="#FFFFFF" />
+                            </MotiView>
+                          )}
+                        </TouchableOpacity>
+                      </MotiView>
+                    );
+                  })}
+                </View>
+              </View>
+            </MotiView>
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', paddingHorizontal: 16 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 },
-  list: { paddingBottom: 40 },
-  card: { backgroundColor: '#ffffff', borderRadius: 16, marginBottom: 16, overflow: 'hidden', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  image: { width: '100%', height: 160 },
-  cardContent: { padding: 16 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  title: { fontSize: 18, fontWeight: 'bold', color: '#1e293b', flex: 1 },
-  badgeDiscount: { backgroundColor: '#10b981', color: '#fff', fontWeight: 'bold', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, overflow: 'hidden' },
-  vendor: { fontSize: 14, color: '#64748b', marginBottom: 8 },
-  originalPrice: { fontSize: 12, color: '#94a3b8', textDecorationLine: 'line-through', marginBottom: 12 },
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  time: { fontSize: 13, color: '#ef4444', fontWeight: '500' },
-  button: { backgroundColor: '#0f172a', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  buttonText: { color: '#fff', fontWeight: '600' },
-  discountBanner: { position: 'absolute', top: 12, left: 12, backgroundColor: '#ef4444', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3, elevation: 4 },
-  discountBannerText: { color: '#ffffff', fontWeight: 'bold', fontSize: 14 }
+  container: { flex: 1, backgroundColor: '#021815' },
+  safeArea: { flex: 1 },
+  heroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: -0.3,
+  },
+  heroSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  avatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(94, 234, 212, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(94, 234, 212, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  toolsContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 10,
+  },
+  dropdownButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    paddingHorizontal: 16, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  dropdownButtonText: { 
+    fontSize: 13, 
+    fontWeight: '700', 
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'flex-end',
+  },
+  menuWrapper: {
+    borderTopLeftRadius: 32, 
+    borderTopRightRadius: 32, 
+    overflow: 'hidden',
+    marginBottom: -100,
+  },
+  menuInnerGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  menuContainer: { 
+    padding: 24, 
+    paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + 100, 
+    backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
+  },
+  dragIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  menuTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: '#FFFFFF', 
+    marginBottom: 24, 
+  },
+  optionsGrid: {
+    marginTop: 8,
+  },
+  menuOptionBlock: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 16, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    overflow: 'hidden',
+  },
+  menuOptionBlockActive: { 
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(94, 234, 212, 0.3)',
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  iconBoxActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  menuOptionTitle: { 
+    fontSize: 16, 
+    fontWeight: '700',
+    color: '#94A3B8',
+    marginBottom: 2,
+  },
+  menuOptionTitleActive: { 
+    color: '#FFFFFF', 
+    fontWeight: '800' 
+  },
+  menuOptionSub: {
+    fontSize: 13,
+    color: 'rgba(148, 163, 184, 0.6)',
+    fontWeight: '500',
+  },
+  menuOptionSubActive: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  centerBox: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 60 },
+  centerText: { marginTop: 14, color: '#94A3B8', fontWeight: '600', fontSize: 13 },
+  list: { paddingHorizontal: 16, paddingBottom: 110, paddingTop: 4 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 32 },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#F8FAFC', marginTop: 16 },
+  emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginTop: 6, lineHeight: 19 },
 });

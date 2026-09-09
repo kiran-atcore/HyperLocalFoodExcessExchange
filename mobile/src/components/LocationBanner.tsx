@@ -1,18 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, Easing, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
+import Toast from 'react-native-toast-message';
 
 interface LocationBannerProps {
   address?: string;
   onLocationChange?: (address: string, lat?: number, lng?: number) => void;
   onMapPress?: () => void;
   autoFetch?: boolean;
+  variant?: 'light' | 'dark';
 }
 
-export default function LocationBanner({ address, onLocationChange, onMapPress, autoFetch }: LocationBannerProps = {}) {
+export default function LocationBanner({
+  address,
+  onLocationChange,
+  onMapPress,
+  autoFetch,
+  variant = 'light',
+}: LocationBannerProps = {}) {
   const [isFetching, setIsFetching] = useState(false);
+  const isDark = variant === 'dark';
 
   // High-End Animations
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -66,7 +75,11 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission to access location was denied');
+        Toast.show({
+          type: 'error',
+          text1: 'Permission Denied',
+          text2: 'Permission to access location was denied.',
+        });
         setIsFetching(false);
         return;
       }
@@ -81,7 +94,11 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
         }
         if (!location) throw new Error('GPS not available.');
       } catch (e) {
-        Alert.alert('Error', 'Emulator GPS not set. Please set a location in Extended Controls.');
+        Toast.show({
+          type: 'error',
+          text1: 'GPS Error',
+          text2: 'GPS fix unavailable. Please check location settings.',
+        });
         setIsFetching(false);
         return;
       }
@@ -98,7 +115,11 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
         onLocationChange?.(`GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}`, location.coords.latitude, location.coords.longitude);
       }
     } catch (error: any) {
-      Alert.alert('Error fetching location', error.message || 'Please ensure your emulator has a location set in Extended Controls.');
+      Toast.show({
+        type: 'error',
+        text1: 'Location Error',
+        text2: error.message || 'Unable to fetch current location.',
+      });
       onLocationChange?.('Location Unavailable', undefined, undefined);
     } finally {
       setIsFetching(false);
@@ -113,24 +134,28 @@ export default function LocationBanner({ address, onLocationChange, onMapPress, 
         onPress={onMapPress}
       >
         <LinearGradient
-          colors={['#FFFFFF', '#F8FAFC']}
-          style={styles.card}
+          colors={isDark ? ['rgba(15, 23, 42, 0.88)', 'rgba(4, 47, 46, 0.72)'] : ['#FFFFFF', '#F8FAFC']}
+          style={[styles.card, isDark && styles.cardDark]}
         >
           {/* Ambient Breathing Glow underneath content */}
-          <Animated.View style={[styles.ambientGlow, { 
-            opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.05, 0.4] }) 
-          }]} />
+          <Animated.View style={[
+            styles.ambientGlow,
+            isDark && styles.ambientGlowDark,
+            { 
+              opacity: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.05, 0.4] }) 
+            }
+          ]} />
 
           {/* Left Radar Icon Wrapper */}
-          <View style={styles.leftIconWrapper}>
-            <View style={styles.iconCore}>
-              <Ionicons name="map" size={20} color="#0D9488" />
+          <View style={[styles.leftIconWrapper, isDark && styles.leftIconWrapperDark]}>
+            <View style={[styles.iconCore, isDark && styles.iconCoreDark]}>
+              <Ionicons name="map" size={20} color={isDark ? '#5EEAD4' : '#0D9488'} />
             </View>
           </View>
           
           <View style={styles.textWrapper}>
-            <Text style={styles.label}>Geo-Location Uplink</Text>
-            <Text style={styles.address} numberOfLines={2}>
+            <Text style={[styles.label, isDark && styles.labelDark]}>Geo-Location Uplink</Text>
+            <Text style={[styles.address, isDark && styles.addressDark]} numberOfLines={2}>
               {address || 'Awaiting Coordinates...'}
             </Text>
           </View>
@@ -178,6 +203,12 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 5,
   },
+  cardDark: {
+    borderColor: 'rgba(94, 234, 212, 0.22)',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+  },
   ambientGlow: {
     position: 'absolute',
     top: 0,
@@ -186,6 +217,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: '#CCFBF1',
     borderRadius: 24,
+  },
+  ambientGlowDark: {
+    backgroundColor: 'rgba(94, 234, 212, 0.14)',
   },
   leftIconWrapper: {
     width: 52,
@@ -201,6 +235,11 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
+  leftIconWrapperDark: {
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    shadowColor: '#5EEAD4',
+    shadowOpacity: 0.2,
+  },
   iconCore: {
     width: 40,
     height: 40,
@@ -210,6 +249,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#CCFBF1',
+  },
+  iconCoreDark: {
+    backgroundColor: 'rgba(94, 234, 212, 0.12)',
+    borderColor: 'rgba(94, 234, 212, 0.3)',
   },
   textWrapper: {
     flex: 1,
@@ -223,11 +266,17 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 4,
   },
+  labelDark: {
+    color: '#5EEAD4',
+  },
   address: {
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
     lineHeight: 20,
+  },
+  addressDark: {
+    color: '#F8FAFC',
   },
   gpsButton: {
     width: 48,

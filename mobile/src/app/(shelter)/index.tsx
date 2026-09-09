@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, DeviceEventEmitter, TouchableOpacity, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 
 import api from '../../utils/api';
@@ -69,11 +70,22 @@ export default function ShelterFeedScreen() {
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP'>('LATEST');
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [isLocationReady, setIsLocationReady] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
   const [isScreenFocused, setIsScreenFocused] = useState(false);
+
+  const getSortLabel = () => {
+    switch (sortFilter) {
+      case 'LATEST': return 'Latest';
+      case 'OLDEST': return 'Oldest';
+      case 'EXPENSIVE': return 'Expensive';
+      case 'CHEAP': return 'Cheap';
+    }
+  };
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('onLocationSelected', (data) => {
@@ -189,14 +201,33 @@ export default function ShelterFeedScreen() {
     setFeed((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const filteredFeed = feed.filter((item) => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    const title = (item.title || '').toLowerCase();
-    const donor = (item.donor_name || '').toLowerCase();
-    const desc = (item.description || '').toLowerCase();
-    return title.includes(query) || donor.includes(query) || desc.includes(query);
-  });
+  const getItemPrice = (item: any) => {
+    if (item.listing_type === 'DONATION') {
+      return Number(item.estimated_fmv || item.original_price || 0);
+    }
+    return Number(item.discounted_price !== undefined ? item.discounted_price : item.original_price) || 0;
+  };
+
+  const filteredFeed = feed
+    .filter((item) => {
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+      const title = (item.title || '').toLowerCase();
+      const donor = (item.donor_name || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      return title.includes(query) || donor.includes(query) || desc.includes(query);
+    })
+    .sort((a, b) => {
+      if (sortFilter === 'EXPENSIVE') {
+        return getItemPrice(b) - getItemPrice(a);
+      } else if (sortFilter === 'CHEAP') {
+        return getItemPrice(a) - getItemPrice(b);
+      } else if (sortFilter === 'OLDEST') {
+        return a.id - b.id;
+      } else {
+        return b.id - a.id;
+      }
+    });
 
   const renderItem = ({ item, index }: any) => {
     const targetLat = item.donor_latitude || item.latitude;
@@ -269,6 +300,23 @@ export default function ShelterFeedScreen() {
             }}
             variant="dark"
           />
+
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12, marginBottom: 4 }}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              style={styles.dropdownButton}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowSortMenu(true);
+              }}
+            >
+              <Ionicons name="filter" size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+              <Text style={styles.dropdownButtonText}>
+                {getSortLabel()}
+              </Text>
+              <Ionicons name="chevron-down" size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {!isLocationReady ? (
@@ -317,6 +365,87 @@ export default function ShelterFeedScreen() {
             }
           />
         )}
+
+        {/* Glassmorphic Sort Modal */}
+        <Modal visible={showSortMenu} transparent={true} animationType="fade">
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity 
+              style={StyleSheet.absoluteFill} 
+              activeOpacity={1} 
+              onPress={() => setShowSortMenu(false)}
+            />
+            <MotiView 
+              from={{ translateY: 400, scale: 0.9, opacity: 0 }}
+              animate={{ translateY: 0, scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 150 }}
+              style={styles.menuWrapper}
+            >
+              <LinearGradient
+                colors={['rgba(15, 23, 42, 0.95)', 'rgba(2, 6, 23, 0.95)']}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.menuInnerGlow} />
+
+              <View style={styles.menuContainer}>
+                <View style={styles.dragIndicator} />
+                <Text style={styles.menuTitle}>Sort Surplus</Text>
+                
+                <View style={styles.optionsGrid}>
+                  {[
+                    { id: 'LATEST', label: 'Latest', sub: 'Newest first', icon: 'time' },
+                    { id: 'OLDEST', label: 'Oldest', sub: 'Oldest first', icon: 'time-outline' },
+                    { id: 'EXPENSIVE', label: 'Expensive', sub: 'Highest value first', icon: 'trending-up' },
+                    { id: 'CHEAP', label: 'Cheap', sub: 'Lowest value first', icon: 'trending-down' }
+                  ].map((option, index) => {
+                    const isActive = sortFilter === option.id;
+                    return (
+                      <MotiView
+                        key={option.id}
+                        from={{ opacity: 0, translateY: 15 }}
+                        animate={{ opacity: 1, translateY: 0 }}
+                        transition={{ type: 'spring', delay: index * 100 }}
+                        style={{ width: '100%', marginBottom: 12 }}
+                      >
+                        <TouchableOpacity 
+                          activeOpacity={0.8}
+                          style={[styles.menuOptionBlock, isActive && styles.menuOptionBlockActive]} 
+                          onPress={() => { 
+                            Haptics.selectionAsync();
+                            setSortFilter(option.id as any); 
+                            setTimeout(() => setShowSortMenu(false), 200);
+                          }}
+                        >
+                          {isActive && (
+                            <LinearGradient
+                              colors={['rgba(13, 148, 136, 0.8)', 'rgba(15, 118, 110, 0.9)']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={StyleSheet.absoluteFill}
+                            />
+                          )}
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={[styles.iconBox, isActive && styles.iconBoxActive]}>
+                              <Ionicons name={option.icon as any} size={20} color={isActive ? '#FFFFFF' : '#94A3B8'} />
+                            </View>
+                            <View>
+                              <Text style={[styles.menuOptionTitle, isActive && styles.menuOptionTitleActive]}>{option.label}</Text>
+                              <Text style={[styles.menuOptionSub, isActive && styles.menuOptionSubActive]}>{option.sub}</Text>
+                            </View>
+                          </View>
+                          {isActive && (
+                            <MotiView from={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
+                              <Ionicons name="checkmark-circle" size={28} color="#FFFFFF" />
+                            </MotiView>
+                          )}
+                        </TouchableOpacity>
+                      </MotiView>
+                    );
+                  })}
+                </View>
+              </View>
+            </MotiView>
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -397,5 +526,114 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
+  },
+  dropdownButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    paddingHorizontal: 16, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  dropdownButtonText: { 
+    fontSize: 13, 
+    fontWeight: '700', 
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    justifyContent: 'flex-end',
+  },
+  menuWrapper: {
+    borderTopLeftRadius: 32, 
+    borderTopRightRadius: 32, 
+    overflow: 'hidden',
+    marginBottom: -100,
+  },
+  menuInnerGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  menuContainer: { 
+    padding: 24, 
+    paddingBottom: (Platform.OS === 'ios' ? 40 : 24) + 100, 
+    backgroundColor: Platform.OS === 'android' ? 'rgba(15, 23, 42, 0.95)' : 'transparent',
+  },
+  dragIndicator: {
+    width: 40,
+    height: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  menuTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: '#FFFFFF', 
+    marginBottom: 24, 
+  },
+  optionsGrid: {
+    marginTop: 8,
+  },
+  menuOptionBlock: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 16, 
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    overflow: 'hidden',
+  },
+  menuOptionBlockActive: { 
+    backgroundColor: 'transparent',
+    borderColor: 'rgba(94, 234, 212, 0.3)',
+    shadowColor: '#0D9488',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  iconBoxActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  menuOptionTitle: { 
+    fontSize: 16, 
+    fontWeight: '700',
+    color: '#94A3B8',
+    marginBottom: 2,
+  },
+  menuOptionTitleActive: { 
+    color: '#FFFFFF', 
+    fontWeight: '800' 
+  },
+  menuOptionSub: {
+    fontSize: 13,
+    color: 'rgba(148, 163, 184, 0.6)',
+    fontWeight: '500',
+  },
+  menuOptionSubActive: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
 });

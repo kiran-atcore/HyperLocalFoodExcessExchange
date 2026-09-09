@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from apps.listings.models import FoodListing
 from apps.orders.models import Order
 
@@ -203,16 +203,23 @@ class AdminDashboardStatsView(APIView):
         # 3. Successful Pickups (Count of PICKED_UP orders)
         successful_pickups = Order.objects.filter(status='PICKED_UP').count()
         
-        # 4. Weekly Donations (Mon-Sun for current week)
+        # 4. Weekly Donations (Rolling 7 days)
         today = timezone.now().date()
-        start_of_week = today - timedelta(days=today.weekday())
+        start_of_week = today - timedelta(days=6)
         
         weekly_donations = []
+        weekly_labels = []
         for i in range(7):
             day = start_of_week + timedelta(days=i)
-            # count FoodListings created on this day
-            count = FoodListing.objects.filter(created_at__date=day).count()
+            # Count only successfully picked up orders of type DONATION
+            count = Order.objects.filter(
+                listing__listing_type='DONATION',
+                status='PICKED_UP'
+            ).filter(
+                Q(picked_up_at__date=day) | Q(picked_up_at__isnull=True, created_at__date=day)
+            ).count()
             weekly_donations.append(count)
+            weekly_labels.append(day.strftime("%a"))
             
         # 5. Recent Activity
         logs = ActivityLog.objects.order_by('-timestamp')[:5]
@@ -240,7 +247,11 @@ class AdminDashboardStatsView(APIView):
             "active_kitchens": active_kitchens,
             "active_shelters": active_shelters,
             "successful_pickups": successful_pickups,
-            "weekly_donations": weekly_donations,
+            "weekly_donations": {
+                "values": weekly_donations,
+                "labels": weekly_labels,
+                "total": sum(weekly_donations)
+            },
             "recent_activity": activities
         })
 
@@ -284,11 +295,28 @@ class AdminAnalyticsView(APIView):
         total_donors = User.objects.filter(role='donor', is_approved=True).count()
         total_shelters = User.objects.filter(role='shelter', is_approved=True).count()
 
-        # 2. Order Outcomes
+        # Auto-expire overdue orders across platform
+        Order.objects.filter(
+            listing__pickup_end__lte=timezone.now()
+        ).exclude(
+            status__in=['PICKED_UP', 'CANCELLED', 'EXPIRED']
+        ).update(status='EXPIRED')
+
+        # Also auto-deactivate expired food listings
+        FoodListing.objects.filter(
+            pickup_end__lte=timezone.now(),
+            is_active=True
+        ).update(is_active=False)
+
+        # 2. Order Outcomes & Claims / Surplus Distribution (Irrespective of donation or discount)
         picked_up = Order.objects.filter(status='PICKED_UP').count()
+        # Active Claims: claims in progress (PENDING or APPROVED) awaiting pickup
+        active_claims = Order.objects.filter(status__in=['PENDING', 'APPROVED']).count()
         cancelled = Order.objects.filter(status='CANCELLED').count()
-        expired = Order.objects.filter(status='EXPIRED').count()
-        pending = Order.objects.filter(status='PENDING').count()
+        # Expired: all expired surplus listings + expired unclaimed/unfulfilled orders
+        expired_orders_count = Order.objects.filter(status='EXPIRED').count()
+        expired_listings_count = FoodListing.objects.filter(pickup_end__lte=timezone.now()).count()
+        total_expired = expired_orders_count + expired_listings_count
 
         # 3. Weekly Donations (Rolling 7 days)
         today = timezone.now().date()
@@ -298,7 +326,13 @@ class AdminAnalyticsView(APIView):
         weekly_labels = []
         for i in range(7):
             day = start_of_week + timedelta(days=i)
-            count = FoodListing.objects.filter(created_at__date=day).count()
+            # Count only successfully picked up orders of type DONATION
+            count = Order.objects.filter(
+                listing__listing_type='DONATION',
+                status='PICKED_UP'
+            ).filter(
+                Q(picked_up_at__date=day) | Q(picked_up_at__isnull=True, created_at__date=day)
+            ).count()
             weekly_donations.append(count)
             weekly_labels.append(day.strftime("%a"))
 
@@ -310,12 +344,13 @@ class AdminAnalyticsView(APIView):
             ],
             "order_outcomes": [
                 {"label": "Picked Up", "value": picked_up, "color": "#10b981"},
+                {"label": "Active Claims", "value": active_claims, "color": "#eab308"},
                 {"label": "Cancelled", "value": cancelled, "color": "#ef4444"},
-                {"label": "Expired", "value": expired, "color": "#64748b"},
-                {"label": "Pending", "value": pending, "color": "#eab308"}
+                {"label": "Expired", "value": total_expired, "color": "#64748b"}
             ],
             "weekly_donations": {
                 "values": weekly_donations,
-                "labels": weekly_labels
+                "labels": weekly_labels,
+                "total": sum(weekly_donations)
             }
         })

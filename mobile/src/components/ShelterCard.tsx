@@ -199,7 +199,7 @@ export default function ShelterCard({
               style={{ marginRight: 4 }}
             />
             <Text style={styles.telemetryHighlight} numberOfLines={1}>
-              {remainingCount} {item.quantity_unit || 'portions'} left
+              {remainingCount} {item.quantity_unit || 'portions'} {item.listing_type === 'DISCOUNT' ? 'left' : 'available'}
             </Text>
           </View>
 
@@ -220,7 +220,7 @@ export default function ShelterCard({
 
         {/* Description snippet if available */}
         {item.description ? (
-          <Text style={styles.descriptionText} numberOfLines={2}>
+          <Text style={styles.descriptionText} numberOfLines={1}>
             {item.description}
           </Text>
         ) : null}
@@ -232,8 +232,8 @@ export default function ShelterCard({
               isClaimed
                 ? 'Already Claimed'
                 : item.listing_type === 'DONATION'
-                ? 'Claim for NGO'
-                : 'Buy at Discount'
+                  ? 'Claim for NGO'
+                  : 'Buy at Discount'
             }
             icon={
               item.listing_type === 'DONATION'
@@ -247,11 +247,15 @@ export default function ShelterCard({
               isClaimed
                 ? ['#1E293B', '#0F172A']
                 : item.listing_type === 'DONATION'
-                ? ['#0D9488', '#042F2E']
-                : ['#FF8A8A', '#FA5252', '#E03131']
+                  ? ['#0D9488', '#042F2E']
+                  : ['#FF8A8A', '#FA5252', '#E03131']
             }
             sheen={!isClaimed}
-            contentStyle={{ paddingVertical: 12 }}
+            contentStyle={{
+              paddingVertical: 12,
+              borderColor: 'rgba(94, 234, 212, 0.45)',
+              borderWidth: 1.5,
+            }}
             textStyle={styles.ctaText}
           />
         </View>
