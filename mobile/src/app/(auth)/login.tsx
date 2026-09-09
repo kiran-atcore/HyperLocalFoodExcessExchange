@@ -168,17 +168,10 @@ export default function LoginScreen() {
     ]
   });
 
-  const { control, handleSubmit, formState: { errors }, setValue, reset } = useForm({
+  const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: yupResolver(schema),
     defaultValues: { email: '', password: '' }
   });
-
-  const handleAdminLogin = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setValue('email', 'kiranchand.0987@gmail.com');
-    setValue('password', 'Kiran@Kirra@1234');
-    handleSubmit(onSubmit)();
-  };
 
   const onSubmit = async (data: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -329,10 +322,6 @@ export default function LoginScreen() {
                         router.push('/(auth)/register');
                       }} activeOpacity={0.6}>
                         <Text style={styles.linkText}>Don't have an account? <Text style={styles.linkTextBold}>Sign up</Text></Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.adminButton} onPress={handleAdminLogin} activeOpacity={0.7}>
-                        <Text style={styles.adminText}>Admin Access</Text>
                       </TouchableOpacity>
                     </View>
                   </Animated.View>
@@ -568,18 +557,5 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: '#0D9488',
     fontWeight: '800',
-  },
-  adminButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-  },
-  adminText: {
-    color: '#4B5563',
-    fontSize: 13,
-    fontWeight: '700'
   }
 });

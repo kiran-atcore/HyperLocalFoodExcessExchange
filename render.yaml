@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: hyperlocal-food-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: ./build.sh
+    startCommand: daphne -b 0.0.0.0 -p $PORT core.asgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
