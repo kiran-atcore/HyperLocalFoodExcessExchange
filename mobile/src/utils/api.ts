@@ -2,8 +2,7 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 const api = axios.create({
-  // Use 10.0.2.2 for Android Emulator, or your local IP for physical devices
-  baseURL: 'http://10.0.2.2:8000/api',
+  baseURL: 'https://hyperlocalfoodexcessexchange.onrender.com/api',
 });
 
 api.interceptors.request.use(async (config) => {

@@ -12,7 +12,8 @@ from django.db.models import Sum, Q
 from apps.listings.models import FoodListing
 from apps.orders.models import Order
 
-from .models import ActivityLog
+import requests
+from .models import ActivityLog, RoleType
 
 User = get_user_model()
 
@@ -354,3 +355,63 @@ class AdminAnalyticsView(APIView):
                 "total": sum(weekly_donations)
             }
         })
+
+
+class GoogleLoginView(APIView):
+    permission_classes = (AllowAny,)
+
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({'detail': 'Token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # First try userinfo endpoint with Bearer access token
+            google_res = requests.get(
+                'https://www.googleapis.com/oauth2/v3/userinfo',
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=8
+            )
+            if google_res.status_code != 200:
+                # Fallback: check tokeninfo if an ID token was supplied
+                google_res = requests.get(
+                    f'https://oauth2.googleapis.com/tokeninfo?id_token={token}',
+                    timeout=8
+                )
+
+            if google_res.status_code != 200:
+                return Response({'detail': 'Invalid Google token or session expired.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            data = google_res.json()
+            email = data.get('email')
+            if not email:
+                return Response({'detail': 'Google account email not accessible.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            first_name = data.get('given_name') or (data.get('name', '').split(' ')[0] if data.get('name') else 'User')
+            last_name = data.get('family_name', '')
+
+            user = User.objects.filter(email=email).first()
+            if not user:
+                user = User.objects.create_user(
+                    email=email,
+                    password=None,
+                    role=RoleType.CONSUMER,
+                    first_name=first_name,
+                    last_name=last_name,
+                    is_approved=True,
+                    approval_status='APPROVED'
+                )
+                ActivityLog.objects.create(
+                    text=f"User {user.first_name or user.email} signed up via Google",
+                    type="user",
+                    related_user=user
+                )
+
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'access': str(refresh.access_token),
+                'refresh': str(refresh),
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'detail': f'Google authentication failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

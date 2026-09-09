@@ -6,12 +6,39 @@ import { useContext, useState, useRef, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import Toast from 'react-native-toast-message';
+import Svg, { Path } from 'react-native-svg';
 import { AuthContext } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import InputField from '../../components/InputField';
 import ButtonOne from '../../components/ButtonOne';
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GoogleLogo = ({ size = 26 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"
+    />
+    <Path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+    />
+    <Path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </Svg>
+);
 
 const { width } = Dimensions.get('window');
 
@@ -24,6 +51,7 @@ export default function LoginScreen() {
   const { login } = useContext(AuthContext);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Entrance Animation Values
@@ -31,7 +59,8 @@ export default function LoginScreen() {
   const slideAnim = useRef(new Animated.Value(80)).current;
   const cardScale = useRef(new Animated.Value(0.9)).current;
   const cardRotateX = useRef(new Animated.Value(-20)).current;
-  const staggerAnims = useRef([...Array(4)].map(() => new Animated.Value(0))).current;
+  const staggerAnims = useRef([...Array(5)].map(() => new Animated.Value(0))).current;
+  const googleButtonScale = useRef(new Animated.Value(1)).current;
 
   // Background Blob Animation Values
   const blob1 = useRef(new Animated.Value(0)).current;
@@ -172,6 +201,85 @@ export default function LoginScreen() {
     resolver: yupResolver(schema),
     defaultValues: { email: '', password: '' }
   });
+
+  const handleGooglePressIn = () => {
+    Animated.spring(googleButtonScale, {
+      toValue: 0.9,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleGooglePressOut = () => {
+    Animated.spring(googleButtonScale, {
+      toValue: 1,
+      friction: 4,
+      tension: 50,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleGoogleSignIn = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsGoogleLoading(true);
+    setErrorMsg('');
+    try {
+      const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        Toast.show({
+          type: 'info',
+          text1: 'Google Client ID Required',
+          text2: 'Set EXPO_PUBLIC_GOOGLE_CLIENT_ID in mobile/.env',
+        });
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      const redirectUri = Linking.createURL('/');
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(
+        clientId
+      )}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&response_type=token%20id_token&scope=${encodeURIComponent(
+        'openid email profile'
+      )}&nonce=${Math.random().toString(36).substring(7)}`;
+
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+      if (result.type === 'success' && result.url) {
+        const hash = result.url.split('#')[1] || '';
+        const query = result.url.split('?')[1] || '';
+        const params = new URLSearchParams(hash || query);
+        const token = params.get('access_token') || params.get('id_token');
+
+        if (token) {
+          const response = await api.post('/users/google-login/', { token });
+          await login(response.data.access, response.data.refresh);
+          Toast.show({
+            type: 'success',
+            text1: 'Welcome!',
+            text2: 'Signed in with Google successfully.',
+          });
+          router.replace('/');
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Sign-in Failed',
+            text2: 'No authorization token returned from Google.',
+          });
+        }
+      }
+    } catch (err: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Google Sign-In Error',
+        text2: err.response?.data?.detail || err.message || 'Authentication failed',
+      });
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   const onSubmit = async (data: any) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -316,6 +424,36 @@ export default function LoginScreen() {
                   </Animated.View>
 
                   <Animated.View style={{ opacity: staggerAnims[3], transform: [{ translateY: staggerAnims[3].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
+                    <View style={styles.dividerRow}>
+                      <View style={styles.dividerLine} />
+                      <Text style={styles.dividerText}>or continue with</Text>
+                      <View style={styles.dividerLine} />
+                    </View>
+
+                    <View style={styles.socialRow}>
+                      <Animated.View style={{ transform: [{ scale: googleButtonScale }] }}>
+                        <TouchableOpacity
+                          style={styles.googleCircleButton}
+                          onPress={handleGoogleSignIn}
+                          onPressIn={handleGooglePressIn}
+                          onPressOut={handleGooglePressOut}
+                          activeOpacity={0.9}
+                          disabled={isGoogleLoading}
+                          accessibilityLabel="Sign in with Google"
+                        >
+                          {isGoogleLoading ? (
+                            <ActivityIndicator size="small" color="#0D9488" />
+                          ) : (
+                            <View style={styles.googleCircleInner}>
+                              <GoogleLogo size={26} />
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      </Animated.View>
+                    </View>
+                  </Animated.View>
+
+                  <Animated.View style={{ opacity: staggerAnims[4], transform: [{ translateY: staggerAnims[4].interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }}>
                     <View style={styles.footerContainer}>
                       <TouchableOpacity onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -545,9 +683,8 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   footerContainer: {
-    marginTop: 36,
+    marginTop: 20,
     alignItems: 'center',
-    gap: 16,
   },
   linkText: {
     color: '#4B5563',
@@ -557,5 +694,57 @@ const styles = StyleSheet.create({
   linkTextBold: {
     color: '#0D9488',
     fontWeight: '800',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  dividerText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
+  socialRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  googleCircleButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  googleCircleInner: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   }
 });
