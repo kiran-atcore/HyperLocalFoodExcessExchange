@@ -53,7 +53,7 @@ export default function OTPScreen() {
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+
 
   useEffect(() => {
     Animated.parallel([
@@ -113,16 +113,6 @@ export default function OTPScreen() {
   }, [attemptsRemaining]);
 
 
-  const triggerShake = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
-    ]).start();
-  };
-
   const handleOtpChange = (value: string) => {
     const cleanDigits = value.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH);
     setOtp(cleanDigits);
@@ -173,21 +163,18 @@ export default function OTPScreen() {
 
     if (enteredOtp.length !== OTP_LENGTH) {
       setErrorMsg('Please enter the full 6-digit verification code.');
-      triggerShake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
 
     if (expiryTimer <= 0) {
       setErrorMsg('This code has expired. Please tap "Resend Code".');
-      triggerShake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
 
     if (attemptsRemaining <= 0) {
       setErrorMsg('Maximum attempts exceeded. Please request a new code.');
-      triggerShake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
@@ -254,7 +241,6 @@ export default function OTPScreen() {
         });
       }
     } catch (err: any) {
-      triggerShake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const remaining = err.response?.data?.attempts_remaining;
       if (typeof remaining === 'number') {
@@ -387,12 +373,7 @@ export default function OTPScreen() {
 
 
                 {/* 6 Digit OTP Inputs */}
-                <Animated.View
-                  style={[
-                    styles.otpContainer,
-                    { transform: [{ translateX: shakeAnim }] },
-                  ]}
-                >
+                <View style={styles.otpContainer}>
                   <TextInput
                     ref={hiddenInputRef}
                     value={otp}
@@ -430,7 +411,7 @@ export default function OTPScreen() {
                       </TouchableOpacity>
                     );
                   })}
-                </Animated.View>
+                </View>
 
                 {/* Verify Button */}
                 <View style={styles.buttonWrapper}>
