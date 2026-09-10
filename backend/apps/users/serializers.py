@@ -46,21 +46,41 @@ class RegisterSerializer(serializers.ModelSerializer):
         is_approved = True if role in ['consumer', 'admin'] else False
         approval_status = 'APPROVED' if is_approved else 'PENDING'
         
-        user = User.objects.create_user(
-            email=validated_data['email'],
-            password=validated_data['password'],
-            role=role,
-            business_name=validated_data.get('business_name', ''),
-            phone_number=validated_data.get('phone_number', ''),
-            address=validated_data.get('address', ''),
-            latitude=validated_data.get('latitude', None),
-            longitude=validated_data.get('longitude', None),
-            profile_picture=validated_data.get('profile_picture', None),
-            first_name=validated_data.get('first_name', ''),
-            last_name=validated_data.get('last_name', ''),
-            is_approved=is_approved,
-            approval_status=approval_status
-        )
+        try:
+            user = User.objects.create_user(
+                email=validated_data['email'],
+                password=validated_data['password'],
+                role=role,
+                business_name=validated_data.get('business_name', ''),
+                phone_number=validated_data.get('phone_number', ''),
+                address=validated_data.get('address', ''),
+                latitude=validated_data.get('latitude', None),
+                longitude=validated_data.get('longitude', None),
+                profile_picture=validated_data.get('profile_picture', None),
+                first_name=validated_data.get('first_name', ''),
+                last_name=validated_data.get('last_name', ''),
+                is_approved=is_approved,
+                approval_status=approval_status
+            )
+        except Exception as e:
+            if validated_data.get('profile_picture') and ('api_key' in str(e).lower() or 'cloudinary' in str(e).lower() or 'upload' in str(e).lower()):
+                user = User.objects.create_user(
+                    email=validated_data['email'],
+                    password=validated_data['password'],
+                    role=role,
+                    business_name=validated_data.get('business_name', ''),
+                    phone_number=validated_data.get('phone_number', ''),
+                    address=validated_data.get('address', ''),
+                    latitude=validated_data.get('latitude', None),
+                    longitude=validated_data.get('longitude', None),
+                    profile_picture=None,
+                    first_name=validated_data.get('first_name', ''),
+                    last_name=validated_data.get('last_name', ''),
+                    is_approved=is_approved,
+                    approval_status=approval_status
+                )
+            else:
+                raise e
         return user
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

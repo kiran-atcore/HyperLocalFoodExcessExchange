@@ -445,21 +445,42 @@ class GoogleLoginView(APIView):
                         except Exception:
                             profile_pic_file = None
 
-                user = User.objects.create_user(
-                    email=email,
-                    password=None,
-                    role=assigned_role,
-                    first_name=first_name,
-                    last_name=last_name,
-                    business_name=business_name,
-                    phone_number=phone_number,
-                    address=address,
-                    latitude=latitude if latitude not in [None, ''] else None,
-                    longitude=longitude if longitude not in [None, ''] else None,
-                    profile_picture=profile_pic_file,
-                    is_approved=is_approved,
-                    approval_status=approval_status
-                )
+                try:
+                    user = User.objects.create_user(
+                        email=email,
+                        password=None,
+                        role=assigned_role,
+                        first_name=first_name,
+                        last_name=last_name,
+                        business_name=business_name,
+                        phone_number=phone_number,
+                        address=address,
+                        latitude=latitude if latitude not in [None, ''] else None,
+                        longitude=longitude if longitude not in [None, ''] else None,
+                        profile_picture=profile_pic_file,
+                        is_approved=is_approved,
+                        approval_status=approval_status
+                    )
+                except Exception as e:
+                    # If Cloudinary API key is invalid or upload fails, fall back to creating user without the picture
+                    if profile_pic_file and ('api_key' in str(e).lower() or 'cloudinary' in str(e).lower() or 'upload' in str(e).lower()):
+                        user = User.objects.create_user(
+                            email=email,
+                            password=None,
+                            role=assigned_role,
+                            first_name=first_name,
+                            last_name=last_name,
+                            business_name=business_name,
+                            phone_number=phone_number,
+                            address=address,
+                            latitude=latitude if latitude not in [None, ''] else None,
+                            longitude=longitude if longitude not in [None, ''] else None,
+                            profile_picture=None,
+                            is_approved=is_approved,
+                            approval_status=approval_status
+                        )
+                    else:
+                        raise e
                 action_text = "registered as"
                 if user.role in ['donor', 'shelter'] and user.approval_status == 'PENDING':
                     action_text = "requested as"
