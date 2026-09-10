@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
-from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer
+from .serializers import RegisterSerializer, CustomTokenObtainPairSerializer, UserSerializer, Base64ImageField
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum, Q
@@ -14,9 +14,11 @@ from apps.listings.models import FoodListing
 from apps.orders.models import Order
 from django.core.mail import send_mail
 from django.conf import settings
+from django.core.files.base import ContentFile
 import random
 import secrets
 import requests
+import uuid
 from .models import ActivityLog, RoleType, EmailOTP
 
 User = get_user_model()
@@ -403,12 +405,45 @@ class GoogleLoginView(APIView):
                 is_new_user = True
                 
                 if action == 'check':
-                    return Response({'is_new_user': True}, status=status.HTTP_200_OK)
+                    return Response({
+                        'is_new_user': True,
+                        'email': email,
+                        'first_name': first_name,
+                        'last_name': last_name,
+                        'picture': data.get('picture', ''),
+                    }, status=status.HTTP_200_OK)
 
                 valid_roles = [RoleType.CONSUMER, RoleType.DONOR, RoleType.SHELTER]
                 assigned_role = selected_role if selected_role in valid_roles else RoleType.CONSUMER
                 is_approved = True if assigned_role == RoleType.CONSUMER else False
                 approval_status = 'APPROVED' if is_approved else 'PENDING'
+
+                req_first_name = request.data.get('first_name')
+                if req_first_name:
+                    first_name = req_first_name
+                business_name = request.data.get('business_name', '')
+                phone_number = request.data.get('phone_number', '')
+                address = request.data.get('address', '')
+                latitude = request.data.get('latitude')
+                longitude = request.data.get('longitude')
+                profile_pic_data = request.data.get('profile_picture')
+
+                profile_pic_file = None
+                if profile_pic_data:
+                    if isinstance(profile_pic_data, str) and profile_pic_data.startswith('data:image'):
+                        try:
+                            profile_pic_file = Base64ImageField().to_internal_value(profile_pic_data)
+                        except Exception:
+                            profile_pic_file = None
+                    elif isinstance(profile_pic_data, str) and (profile_pic_data.startswith('http://') or profile_pic_data.startswith('https://')):
+                        try:
+                            img_res = requests.get(profile_pic_data, timeout=5)
+                            if img_res.status_code == 200:
+                                ext = 'jpg'
+                                file_name = f"{uuid.uuid4().hex[:10]}.{ext}"
+                                profile_pic_file = ContentFile(img_res.content, name=file_name)
+                        except Exception:
+                            profile_pic_file = None
 
                 user = User.objects.create_user(
                     email=email,
@@ -416,15 +451,30 @@ class GoogleLoginView(APIView):
                     role=assigned_role,
                     first_name=first_name,
                     last_name=last_name,
+                    business_name=business_name,
+                    phone_number=phone_number,
+                    address=address,
+                    latitude=latitude if latitude not in [None, ''] else None,
+                    longitude=longitude if longitude not in [None, ''] else None,
+                    profile_picture=profile_pic_file,
                     is_approved=is_approved,
                     approval_status=approval_status
                 )
+                action_text = "registered as"
+                if user.role in ['donor', 'shelter'] and user.approval_status == 'PENDING':
+                    action_text = "requested as"
+
                 ActivityLog.objects.create(
-                    text=f"User {user.first_name or user.email} signed up via Google as {user.role}",
+                    text=f"User {user.first_name or user.email} {action_text} {user.role} via Google",
                     type="user",
                     related_user=user
                 )
             else:
+                if action == 'register':
+                    return Response({
+                        'detail': 'This Google account is already registered. Please sign in instead.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
                 if selected_role and user.role != selected_role:
                     role_names = {
                         RoleType.CONSUMER: 'Consumer',
@@ -439,7 +489,7 @@ class GoogleLoginView(APIView):
                         'detail': f'This Google account is already registered as a {existing_role_str}. Please select {existing_role_str} to sign in.'
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-            refresh = RefreshToken.for_user(user)
+            refresh = CustomTokenObtainPairSerializer.get_token(user)
             return Response({
                 'access': str(refresh.access_token),
                 'refresh': str(refresh),

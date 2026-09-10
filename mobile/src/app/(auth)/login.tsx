@@ -268,44 +268,45 @@ export default function LoginScreen() {
   };
 
   const [pendingGoogleToken, setPendingGoogleToken] = useState<string | null>(null);
+  const [pendingGoogleData, setPendingGoogleData] = useState<{
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    picture?: string;
+  } | null>(null);
 
-  const handleRoleSelected = async (selectedRole: UserRole) => {
+  const handleRoleSelected = (selectedRole: UserRole) => {
     setIsGoogleModalOpen(false);
     if (!pendingGoogleToken) return;
 
-    setIsGoogleLoading(true);
-    try {
-      const response = await api.post('/users/google-login/', { token: pendingGoogleToken, role: selectedRole, action: 'login' });
-      await login(response.data.access, response.data.refresh);
-      
-      const isNewUser = response.data.is_new_user;
-      const user = response.data.user;
-      const userId = String(user?.id || 'new');
+    const profileParams = {
+      id: 'new',
+      email: pendingGoogleData?.email || '',
+      first_name: pendingGoogleData?.first_name || '',
+      business_name: pendingGoogleData?.first_name || '',
+      profile_picture: pendingGoogleData?.picture || '',
+      role: selectedRole,
+      authProvider: 'google',
+      googleToken: pendingGoogleToken,
+      fromSignup: 'true',
+    };
 
-      Toast.show({
-        type: 'success',
-        text1: 'Account Created!',
-        text2: 'Please complete your profile to finish setup.',
-      });
+    setPendingGoogleToken(null);
+    setPendingGoogleData(null);
 
-      if (user?.role === 'donor') {
-        router.replace({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: { id: userId, fromSignup: 'true' } });
-      } else if (user?.role === 'shelter') {
-        router.replace({ pathname: '/(forms)/edit-shelter-profile/[id]', params: { id: userId, fromSignup: 'true' } });
-      } else {
-        router.replace({ pathname: '/(forms)/edit-consumer-profile/[id]', params: { id: userId, fromSignup: 'true' } });
-      }
-    } catch (err: any) {
-      const isRoleConflict = err.response?.data?.role_conflict;
-      Toast.show({
-        type: 'error',
-        text1: isRoleConflict ? 'Account Role Conflict' : 'Google Sign-In Error',
-        text2: err.response?.data?.detail || err.message || 'Authentication failed',
-        visibilityTime: 6000,
-      });
-    } finally {
-      setIsGoogleLoading(false);
-      setPendingGoogleToken(null);
+    Toast.show({
+      type: 'info',
+      text1: 'Almost there!',
+      text2: 'Complete your profile to finish creating your account.',
+      visibilityTime: 4000,
+    });
+
+    if (selectedRole === 'donor') {
+      router.push({ pathname: '/(forms)/edit-kitchen-profile/[id]', params: profileParams });
+    } else if (selectedRole === 'shelter') {
+      router.push({ pathname: '/(forms)/edit-shelter-profile/[id]', params: profileParams });
+    } else {
+      router.push({ pathname: '/(forms)/edit-consumer-profile/[id]', params: profileParams });
     }
   };
 
@@ -359,6 +360,12 @@ export default function LoginScreen() {
           
           if (checkResponse.data.is_new_user) {
             setPendingGoogleToken(token);
+            setPendingGoogleData({
+              email: checkResponse.data.email || '',
+              first_name: checkResponse.data.first_name || '',
+              last_name: checkResponse.data.last_name || '',
+              picture: checkResponse.data.picture || '',
+            });
             setIsGoogleModalOpen(true);
           } else {
             // User exists, tokens are returned
@@ -595,7 +602,11 @@ export default function LoginScreen() {
         {/* Google Role Selection Modal */}
         <GoogleModal
           visible={isGoogleModalOpen}
-          onClose={() => setIsGoogleModalOpen(false)}
+          onClose={() => {
+            setIsGoogleModalOpen(false);
+            setPendingGoogleToken(null);
+            setPendingGoogleData(null);
+          }}
           onSelectRole={handleRoleSelected}
         />
 

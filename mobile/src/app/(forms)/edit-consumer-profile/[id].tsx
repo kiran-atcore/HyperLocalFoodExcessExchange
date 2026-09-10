@@ -11,6 +11,7 @@ import ProfileImagePicker from '../../../components/ProfileImagePicker';
 import ButtonOne from '../../../components/ButtonOne';
 import LoadingScreen from '../../../components/LoadingScreen';
 import { useAlert } from '../../../context/AlertContext';
+import Toast from 'react-native-toast-message';
 
 const RadarRipple = ({ initialDelay = 0 }: { initialDelay?: number }) => {
   const anim = useRef(new Animated.Value(0)).current;
@@ -109,9 +110,12 @@ export default function EditConsumerProfileScreen() {
 
   useEffect(() => {
     if (id === 'new') {
-      setName((params.business_name as string) || '');
+      setName((params.first_name as string) || (params.business_name as string) || '');
       setRegEmail((params.email as string) || '');
       setRegPassword((params.password as string) || '');
+      if (params.profile_picture) {
+        setProfilePicture(params.profile_picture as string);
+      }
       setLoading(false);
     } else {
       fetchProfile();
@@ -169,23 +173,40 @@ export default function EditConsumerProfileScreen() {
     setIsSubmitting(true);
     try {
       if (id === 'new') {
-        await api.post('/users/register/', {
-          email: regEmail || (params.email as string),
-          password: regPassword || (params.password as string),
-          business_name: name.trim(),
-          first_name: name.trim(),
-          role: 'consumer',
-          phone_number: phoneNumber.trim(),
-          address: address.trim(),
-          profile_picture: profilePicture,
-        });
+        if (params.authProvider === 'google' || params.googleToken) {
+          const response = await api.post('/users/google-login/', {
+            token: params.googleToken as string,
+            role: 'consumer',
+            action: 'register',
+            first_name: name.trim(),
+            business_name: name.trim(),
+            phone_number: cleanPhone,
+            address: address.trim(),
+            profile_picture: profilePicture,
+          });
+          await login(response.data.access, response.data.refresh);
+          showAlert("Welcome!", "Your account has been created successfully.", "success", () => {
+            router.replace('/');
+          });
+        } else {
+          await api.post('/users/register/', {
+            email: regEmail || (params.email as string),
+            password: regPassword || (params.password as string),
+            business_name: name.trim(),
+            first_name: name.trim(),
+            role: 'consumer',
+            phone_number: phoneNumber.trim(),
+            address: address.trim(),
+            profile_picture: profilePicture,
+          });
 
-        const loginRes = await api.post('/users/login/', {
-          email: regEmail || (params.email as string),
-          password: regPassword || (params.password as string),
-        });
-        await login(loginRes.data.access, loginRes.data.refresh);
-        router.replace('/');
+          const loginRes = await api.post('/users/login/', {
+            email: regEmail || (params.email as string),
+            password: regPassword || (params.password as string),
+          });
+          await login(loginRes.data.access, loginRes.data.refresh);
+          router.replace('/');
+        }
       } else {
         const payload: any = {
           first_name: name.trim(),
@@ -215,7 +236,14 @@ export default function EditConsumerProfileScreen() {
   };
 
   const handleBack = () => {
-    if (params.fromSignup === 'true' || !router.canGoBack()) {
+    if (id === 'new') {
+      Toast.show({
+        type: 'info',
+        text1: 'Sign-up Cancelled',
+        text2: 'Account creation was cancelled.',
+      });
+      router.replace('/(auth)/login');
+    } else if (params.fromSignup === 'true' || !router.canGoBack()) {
       router.replace('/(auth)/login');
     } else {
       router.back();

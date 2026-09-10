@@ -12,6 +12,7 @@ import LoadingScreen from '../../../components/LoadingScreen';
 import * as Location from 'expo-location';
 import { AuthContext } from '../../../context/AuthContext';
 import { useAlert } from '../../../context/AlertContext';
+import Toast from 'react-native-toast-message';
 
 const RadarRipple = ({ initialDelay = 0 }: { initialDelay?: number }) => {
   const anim = useRef(new Animated.Value(0)).current;
@@ -96,10 +97,14 @@ export default function EditShelterProfileScreen() {
 
   useEffect(() => {
     if (id === 'new') {
+      setName((params.first_name as string) || '');
       setBusinessName((params.business_name as string) || '');
       setRegEmail((params.email as string) || '');
       setRegPassword((params.password as string) || '');
       setRegRole((params.role as string) || '');
+      if (params.profile_picture) {
+        setProfilePicture(params.profile_picture as string);
+      }
       setAddress('Fetching location...');
       fetchCurrentLocation();
       setLoading(false);
@@ -220,27 +225,46 @@ export default function EditShelterProfileScreen() {
     setIsSubmitting(true);
     try {
       if (id === 'new') {
-        await api.post('/users/register/', {
-          email: regEmail || (params.email as string),
-          password: regPassword || (params.password as string),
-          business_name: businessName,
-          first_name: name,
-          role: regRole || (params.role as string),
-          phone_number: phoneNumber,
-          address: address,
-          latitude: lat,
-          longitude: lng,
-          profile_picture: profilePicture,
-        });
+        if (params.authProvider === 'google' || params.googleToken) {
+          const response = await api.post('/users/google-login/', {
+            token: params.googleToken as string,
+            role: regRole || (params.role as string) || 'shelter',
+            action: 'register',
+            business_name: businessName.trim(),
+            first_name: name.trim(),
+            phone_number: phoneNumber.trim(),
+            address: address.trim(),
+            latitude: lat,
+            longitude: lng,
+            profile_picture: profilePicture,
+          });
+          await login(response.data.access, response.data.refresh);
+          showAlert("Request Sent", "Your account is pending admin approval.", "success", () => {
+            router.replace('/');
+          });
+        } else {
+          await api.post('/users/register/', {
+            email: regEmail || (params.email as string),
+            password: regPassword || (params.password as string),
+            business_name: businessName,
+            first_name: name,
+            role: regRole || (params.role as string),
+            phone_number: phoneNumber,
+            address: address,
+            latitude: lat,
+            longitude: lng,
+            profile_picture: profilePicture,
+          });
 
-        const loginRes = await api.post('/users/login/', {
-          email: regEmail || (params.email as string),
-          password: regPassword || (params.password as string),
-        });
-        await login(loginRes.data.access, loginRes.data.refresh);
-        showAlert("Request Sent", "Your account is pending admin approval.", "success", () => {
-          router.replace('/');
-        });
+          const loginRes = await api.post('/users/login/', {
+            email: regEmail || (params.email as string),
+            password: regPassword || (params.password as string),
+          });
+          await login(loginRes.data.access, loginRes.data.refresh);
+          showAlert("Request Sent", "Your account is pending admin approval.", "success", () => {
+            router.replace('/');
+          });
+        }
       } else {
         const payload = {
           business_name: businessName,
@@ -318,7 +342,14 @@ export default function EditShelterProfileScreen() {
   };
 
   const handleBack = () => {
-    if (params.fromSignup === 'true' || !router.canGoBack()) {
+    if (id === 'new') {
+      Toast.show({
+        type: 'info',
+        text1: 'Sign-up Cancelled',
+        text2: 'Account creation was cancelled.',
+      });
+      router.replace('/(auth)/login');
+    } else if (params.fromSignup === 'true' || !router.canGoBack()) {
       router.replace('/(auth)/login');
     } else {
       router.back();
