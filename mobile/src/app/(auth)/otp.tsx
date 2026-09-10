@@ -35,8 +35,8 @@ export default function OTPScreen() {
   const password = (params.password as string) || '';
   const role = (params.role as string) || 'consumer';
 
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
-  const [activeCell, setActiveCell] = useState(0);
+  const [otp, setOtp] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -46,8 +46,9 @@ export default function OTPScreen() {
   const [expiryTimer, setExpiryTimer] = useState(OTP_VALIDITY_SECONDS);
   const [resendTimer, setResendTimer] = useState(RESEND_COOLDOWN_SECONDS);
 
-  // Input refs
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  // Input ref
+  const hiddenInputRef = useRef<TextInput | null>(null);
+
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -69,9 +70,9 @@ export default function OTPScreen() {
       }),
     ]).start();
 
-    // Auto-focus first input
+    // Auto-focus hidden input
     const focusTimeout = setTimeout(() => {
-      inputRefs.current[0]?.focus();
+      hiddenInputRef.current?.focus();
     }, 400);
 
     return () => clearTimeout(focusTimeout);
@@ -95,6 +96,23 @@ export default function OTPScreen() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
+  // Route back to register if maximum attempts reached
+  useEffect(() => {
+    if (attemptsRemaining <= 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Maximum Attempts Reached',
+        text2: 'Too many incorrect attempts. Redirecting to registration...',
+        visibilityTime: 3000,
+      });
+      const redirectTimer = setTimeout(() => {
+        router.replace('/(auth)/register');
+      }, 1500);
+      return () => clearTimeout(redirectTimer);
+    }
+  }, [attemptsRemaining]);
+
+
   const triggerShake = () => {
     Animated.sequence([
       Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
@@ -105,47 +123,12 @@ export default function OTPScreen() {
     ]).start();
   };
 
-  const handleOtpChange = (value: string, index: number) => {
-    // Handle paste of complete 6-digit code
-    if (value.length > 1) {
-      const cleanDigits = value.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH);
-      if (cleanDigits.length > 0) {
-        const newOtp = [...otp];
-        for (let i = 0; i < OTP_LENGTH; i++) {
-          newOtp[i] = cleanDigits[i] || '';
-        }
-        setOtp(newOtp);
-        setErrorMsg('');
-        const nextIndex = Math.min(cleanDigits.length, OTP_LENGTH - 1);
-        inputRefs.current[nextIndex]?.focus();
-        setActiveCell(nextIndex);
-        return;
-      }
-    }
-
-    const digit = value.replace(/[^0-9]/g, '');
-    const newOtp = [...otp];
-    newOtp[index] = digit;
-    setOtp(newOtp);
+  const handleOtpChange = (value: string) => {
+    const cleanDigits = value.replace(/[^0-9]/g, '').slice(0, OTP_LENGTH);
+    setOtp(cleanDigits);
     setErrorMsg('');
-
-    if (digit && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-      setActiveCell(index + 1);
-    }
   };
 
-  const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace') {
-      if (!otp[index] && index > 0) {
-        const newOtp = [...otp];
-        newOtp[index - 1] = '';
-        setOtp(newOtp);
-        inputRefs.current[index - 1]?.focus();
-        setActiveCell(index - 1);
-      }
-    }
-  };
 
   const handleResendOtp = async () => {
     if (resendTimer > 0 || isResending) return;
@@ -161,12 +144,12 @@ export default function OTPScreen() {
       });
 
       // Reset state on successful resend
-      setOtp(Array(OTP_LENGTH).fill(''));
+      setOtp('');
       setExpiryTimer(OTP_VALIDITY_SECONDS);
       setResendTimer(RESEND_COOLDOWN_SECONDS);
       setAttemptsRemaining(3);
-      inputRefs.current[0]?.focus();
-      setActiveCell(0);
+      hiddenInputRef.current?.focus();
+
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Toast.show({
@@ -185,7 +168,8 @@ export default function OTPScreen() {
   };
 
   const handleVerify = async () => {
-    const enteredOtp = otp.join('');
+    const enteredOtp = otp;
+
 
     if (enteredOtp.length !== OTP_LENGTH) {
       setErrorMsg('Please enter the full 6-digit verification code.');
@@ -391,13 +375,16 @@ export default function OTPScreen() {
                   </View>
                 </View>
 
-                {/* Error Banner */}
-                {errorMsg ? (
-                  <View style={styles.errorBanner}>
-                    <Ionicons name="alert-circle" size={16} color="#F43F5E" />
-                    <Text style={styles.errorText}>{errorMsg}</Text>
-                  </View>
-                ) : null}
+                {/* Error Banner Slot - Pre-allocated space prevents card alignment jitter */}
+                <View style={styles.errorSlot}>
+                  {errorMsg ? (
+                    <View style={styles.errorBanner}>
+                      <Ionicons name="alert-circle" size={16} color="#F43F5E" />
+                      <Text style={styles.errorText} numberOfLines={2}>{errorMsg}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
 
                 {/* 6 Digit OTP Inputs */}
                 <Animated.View
@@ -406,30 +393,41 @@ export default function OTPScreen() {
                     { transform: [{ translateX: shakeAnim }] },
                   ]}
                 >
-                  {otp.map((digit, index) => {
-                    const isFocused = activeCell === index;
+                  <TextInput
+                    ref={hiddenInputRef}
+                    value={otp}
+                    onChangeText={handleOtpChange}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode"
+                    autoComplete="sms-otp"
+                    maxLength={OTP_LENGTH}
+                    style={styles.hiddenInput}
+                    caretHidden
+                    editable={!isLoading && attemptsRemaining > 0 && expiryTimer > 0}
+                  />
+
+                  {Array.from({ length: OTP_LENGTH }).map((_, index) => {
+                    const digit = otp[index] || '';
+                    const isFocused =
+                      isInputFocused &&
+                      (index === otp.length || (index === OTP_LENGTH - 1 && otp.length === OTP_LENGTH));
                     const isFilled = !!digit;
                     return (
-                      <TextInput
+                      <TouchableOpacity
                         key={index}
-                        ref={(ref) => {
-                          inputRefs.current[index] = ref;
-                        }}
+                        activeOpacity={0.8}
+                        onPress={() => hiddenInputRef.current?.focus()}
                         style={[
                           styles.otpBox,
                           isFocused && styles.otpBoxFocused,
                           isFilled && styles.otpBoxFilled,
                           attemptsRemaining <= 0 && styles.otpBoxDisabled,
                         ]}
-                        value={digit}
-                        onChangeText={(val) => handleOtpChange(val, index)}
-                        onKeyPress={(e) => handleKeyPress(e, index)}
-                        onFocus={() => setActiveCell(index)}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        selectTextOnFocus
-                        editable={!isLoading && attemptsRemaining > 0 && expiryTimer > 0}
-                      />
+                      >
+                        <Text style={styles.otpDigitText}>{digit}</Text>
+                      </TouchableOpacity>
                     );
                   })}
                 </Animated.View>
@@ -563,7 +561,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 8,
     flexWrap: 'wrap',
   },
   badge: {
@@ -596,6 +594,12 @@ const styles = StyleSheet.create({
   badgeTextDanger: {
     color: '#F43F5E',
   },
+  errorSlot: {
+    width: '100%',
+    minHeight: 46,
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,7 +609,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 12,
-    marginBottom: 18,
     width: '100%',
     gap: 8,
   },
@@ -614,6 +617,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     flex: 1,
+  },
+
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
   },
   otpContainer: {
     flexDirection: 'row',
@@ -628,6 +638,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     borderWidth: 1.5,
     borderColor: 'rgba(20, 184, 166, 0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  otpDigitText: {
     color: '#FFFFFF',
     fontSize: 22,
     fontWeight: '700',
