@@ -1,28 +1,81 @@
 import logging
+import os
+import requests
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-def send_transactional_email(to_email: str, subject: str, text_content: str, html_content: str = None) -> bool:
+def send_transactional_email(to_email: str, subject: str, text_content: str, html_content: str = None, fail_silently: bool = True) -> bool:
     """
-    Sends an email using the configured backend (Brevo SMTP in production, console in local dev).
+    Sends an email using Brevo REST API (HTTPS port 443, bypassing Render free tier SMTP port blocks)
+    if BREVO_API_KEY is configured, or falls back to Django's configured EMAIL_BACKEND / SMTP.
     """
     if not to_email:
         logger.warning("Attempted to send email with empty recipient.")
         return False
 
-    from_email = settings.DEFAULT_FROM_EMAIL
+    api_key = getattr(settings, 'BREVO_API_KEY', '') or os.environ.get('BREVO_API_KEY', '')
+    api_key = api_key.strip() if api_key else ''
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'ResQ <kiranchand.0987@gmail.com>')
+    sender_name = "ResQ"
+    sender_email = "kiranchand.0987@gmail.com"
+    if "<" in from_email and ">" in from_email:
+        sender_name = from_email.split("<")[0].strip()
+        sender_email = from_email.split("<")[1].split(">")[0].strip()
+    elif from_email:
+        sender_email = from_email.strip()
+
+    last_error = None
+
+    if api_key:
+        try:
+            payload = {
+                "sender": {"name": sender_name or "ResQ", "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "textContent": text_content,
+            }
+            if html_content:
+                payload["htmlContent"] = html_content
+
+            res = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                json=payload,
+                headers={
+                    "accept": "application/json",
+                    "api-key": api_key,
+                    "content-type": "application/json"
+                },
+                timeout=10
+            )
+            if res.status_code in (200, 201, 202):
+                logger.info(f"Email sent via Brevo REST API to {to_email}: '{subject}'")
+                return True
+            else:
+                last_error = f"Brevo API error ({res.status_code}): {res.text}"
+                logger.error(last_error)
+        except Exception as e:
+            last_error = f"Brevo API request failed: {e}"
+            logger.error(last_error)
+
+    # Fallback to Django mail backend (SMTP or console)
     try:
         msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
         if html_content:
             msg.attach_alternative(html_content, "text/html")
         msg.send(fail_silently=False)
-        logger.info(f"Email sent successfully to {to_email}: '{subject}'")
+        logger.info(f"Email sent successfully via Django mail backend to {to_email}: '{subject}'")
         return True
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
+        if not fail_silently:
+            if last_error:
+                raise Exception(f"{last_error}; SMTP error: {e}")
+            raise e
         return False
+
 
 
 def send_welcome_email(user) -> bool:

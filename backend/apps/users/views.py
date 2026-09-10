@@ -12,6 +12,7 @@ from datetime import timedelta
 from django.db.models import Sum, Q
 from apps.listings.models import FoodListing
 from apps.orders.models import Order
+import logging
 from django.core.mail import send_mail
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -20,8 +21,12 @@ import secrets
 import requests
 import uuid
 from .models import ActivityLog, RoleType, EmailOTP
+from apps.notifications.services import send_transactional_email
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -633,17 +638,17 @@ class SendOTPView(APIView):
         """
 
         try:
-            send_mail(
+            send_transactional_email(
+                to_email=email,
                 subject=subject,
-                message=f"Your ResQ verification code is: {otp_code}. Valid for 4 minutes.",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                html_message=html_message,
+                text_content=f"Your ResQ verification code is: {otp_code}. Valid for 4 minutes.",
+                html_content=html_message,
                 fail_silently=False
             )
         except Exception as e:
-            print(f"Error sending email via Brevo: {e}")
-            return Response({'detail': 'Failed to send verification email. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error sending email via Brevo: {e}")
+            return Response({'detail': f'Failed to send verification email: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
         return Response({
             'message': 'Verification code sent to your email.',
