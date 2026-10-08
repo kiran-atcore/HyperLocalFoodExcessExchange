@@ -76,11 +76,12 @@ export default function ConsumerFeedScreen() {
   const [displayAddress, setDisplayAddress] = useState(sharedLocation.address || '');
   const [etaModalListing, setEtaModalListing] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP'>('LATEST');
+  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP' | 'CLOSEST'>('LATEST');
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   const getSortLabel = () => {
     switch (sortFilter) {
+      case 'CLOSEST': return 'Closest';
       case 'LATEST': return 'Latest';
       case 'OLDEST': return 'Oldest';
       case 'EXPENSIVE': return 'Expensive';
@@ -221,6 +222,19 @@ export default function ConsumerFeedScreen() {
     }
   };
 
+  const getDistanceNumber = (lat1?: number | null, lon1?: number | null, lat2?: number | null, lon2?: number | null) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2); 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    return R * c;
+  };
+
   const getDealPrice = (item: any) => Number(item.discounted_price !== undefined ? item.discounted_price : item.original_price) || 0;
 
   const filteredFeed = feed
@@ -233,7 +247,14 @@ export default function ConsumerFeedScreen() {
       return title.includes(query) || donor.includes(query) || desc.includes(query);
     })
     .sort((a, b) => {
-      if (sortFilter === 'EXPENSIVE') {
+      if (sortFilter === 'CLOSEST') {
+        const userLat = location?.lat || sharedLocation.lat;
+        const userLng = location?.lng || sharedLocation.lng;
+        const distA = getDistanceNumber(userLat, userLng, a.donor_latitude || a.latitude, a.donor_longitude || a.longitude);
+        const distB = getDistanceNumber(userLat, userLng, b.donor_latitude || b.latitude, b.donor_longitude || b.longitude);
+        if (distA !== distB) return distA - distB;
+        return b.id - a.id;
+      } else if (sortFilter === 'EXPENSIVE') {
         return getDealPrice(b) - getDealPrice(a);
       } else if (sortFilter === 'CHEAP') {
         return getDealPrice(a) - getDealPrice(b);
@@ -405,6 +426,7 @@ export default function ConsumerFeedScreen() {
                 
                 <View style={styles.optionsGrid}>
                   {[
+                    { id: 'CLOSEST', label: 'Closest', sub: 'Nearest first', icon: 'location' },
                     { id: 'LATEST', label: 'Latest', sub: 'Newest first', icon: 'time' },
                     { id: 'OLDEST', label: 'Oldest', sub: 'Oldest first', icon: 'time-outline' },
                     { id: 'EXPENSIVE', label: 'Expensive', sub: 'Highest price first', icon: 'trending-up' },

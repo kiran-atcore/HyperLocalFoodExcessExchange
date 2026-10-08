@@ -70,7 +70,7 @@ export default function ShelterFeedScreen() {
   const [feed, setFeed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP'>('LATEST');
+  const [sortFilter, setSortFilter] = useState<'LATEST' | 'OLDEST' | 'EXPENSIVE' | 'CHEAP' | 'CLOSEST'>('LATEST');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [claimingId, setClaimingId] = useState<number | null>(null);
   const [isLocationReady, setIsLocationReady] = useState(false);
@@ -80,6 +80,7 @@ export default function ShelterFeedScreen() {
 
   const getSortLabel = () => {
     switch (sortFilter) {
+      case 'CLOSEST': return 'Closest';
       case 'LATEST': return 'Latest';
       case 'OLDEST': return 'Oldest';
       case 'EXPENSIVE': return 'Expensive';
@@ -201,6 +202,21 @@ export default function ShelterFeedScreen() {
     setFeed((prev) => prev.filter((item) => item.id !== id));
   };
 
+  const getDistanceNumber = (lat1?: number | null, lon1?: number | null, lat2?: number | null, lon2?: number | null) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   const getItemPrice = (item: any) => {
     if (item.listing_type === 'DONATION') {
       return Number(item.estimated_fmv || item.original_price || 0);
@@ -218,7 +234,14 @@ export default function ShelterFeedScreen() {
       return title.includes(query) || donor.includes(query) || desc.includes(query);
     })
     .sort((a, b) => {
-      if (sortFilter === 'EXPENSIVE') {
+      if (sortFilter === 'CLOSEST') {
+        const userLat = location?.lat || sharedLocation.lat;
+        const userLng = location?.lng || sharedLocation.lng;
+        const distA = getDistanceNumber(userLat, userLng, a.donor_latitude || a.latitude, a.donor_longitude || a.longitude);
+        const distB = getDistanceNumber(userLat, userLng, b.donor_latitude || b.latitude, b.donor_longitude || b.longitude);
+        if (distA !== distB) return distA - distB;
+        return b.id - a.id;
+      } else if (sortFilter === 'EXPENSIVE') {
         return getItemPrice(b) - getItemPrice(a);
       } else if (sortFilter === 'CHEAP') {
         return getItemPrice(a) - getItemPrice(b);
@@ -392,6 +415,7 @@ export default function ShelterFeedScreen() {
                 
                 <View style={styles.optionsGrid}>
                   {[
+                    { id: 'CLOSEST', label: 'Closest', sub: 'Nearest first', icon: 'location' },
                     { id: 'LATEST', label: 'Latest', sub: 'Newest first', icon: 'time' },
                     { id: 'OLDEST', label: 'Oldest', sub: 'Oldest first', icon: 'time-outline' },
                     { id: 'EXPENSIVE', label: 'Expensive', sub: 'Highest value first', icon: 'trending-up' },

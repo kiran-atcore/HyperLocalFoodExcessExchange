@@ -111,8 +111,19 @@ ASGI_APPLICATION = 'core.asgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+TURSO_DB_URL = os.environ.get('TURSO_DB_URL') or os.environ.get('TURSO_DATABASE_URL')
+TURSO_AUTH_TOKEN = os.environ.get('TURSO_AUTH_TOKEN', '').strip()
 DATABASE_URL = os.environ.get('DATABASE_URL')
-if DATABASE_URL:
+
+if TURSO_DB_URL:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django_libsql',
+            'NAME': TURSO_DB_URL,
+            'AUTH_TOKEN': TURSO_AUTH_TOKEN,
+        }
+    }
+elif DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.parse(
             DATABASE_URL,
