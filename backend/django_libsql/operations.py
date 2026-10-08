@@ -16,7 +16,8 @@ from django.db.backends.base.operations import BaseDatabaseOperations
 try:
     from django.db.models import CompositePrimaryKey
 except ImportError:
-    CompositePrimaryKey = None
+    class CompositePrimaryKey:
+        pass
 from django.db.models.constants import OnConflict
 from django.db.models.expressions import Col
 from django.utils import timezone
