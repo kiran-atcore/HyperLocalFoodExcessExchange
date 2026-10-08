@@ -153,7 +153,7 @@ def _py_value_to_turso_type(value):
             return {"type": "text", "value": "NaN"}
         if math.isinf(value):
             return {"type": "text", "value": "Infinity" if value > 0 else "-Infinity"}
-        return {"type": "real", "value": value}
+        return {"type": "float", "value": value}
     if isinstance(value, str):
         return {"type": "text", "value": value}
     if isinstance(value, (bytes, memoryview, bytearray)):
@@ -194,7 +194,7 @@ def _turso_value_to_py(cell):
             return float("-inf")
     if ctype == "integer":
         return int(value)
-    if ctype == "real":
+    if ctype in ("real", "float"):
         return float(value)
     if ctype == "blob":
         return base64.b64decode(value)
@@ -452,6 +452,7 @@ class TursoCursor:
             type_map = {
                 "integer": "INTEGER",
                 "real": "REAL",
+                "float": "REAL",
                 "text": "TEXT",
                 "blob": "BLOB",
                 "null": None,
