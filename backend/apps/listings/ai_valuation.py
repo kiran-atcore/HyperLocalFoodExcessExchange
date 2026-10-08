@@ -115,10 +115,10 @@ def _call_groq(prompt):
                 "content": prompt,
             }
         ],
-        model="openai/gpt-oss-20b",
+        model="openai/gpt-oss-120b",
         response_format={"type": "json_object"},
         temperature=0,
-        max_tokens=500
+        max_tokens=1000
     )
     result_str = chat_completion.choices[0].message.content
     return _parse_json_result(result_str)
