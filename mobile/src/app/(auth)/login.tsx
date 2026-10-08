@@ -18,6 +18,7 @@ import InputField from '../../components/InputField';
 import ButtonOne from '../../components/ButtonOne';
 import GoogleModal, { UserRole } from '../../components/GoogleModal';
 import EmailModal from '../../components/EmailModal';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -315,7 +316,10 @@ export default function LoginScreen() {
     setIsGoogleLoading(true);
     setErrorMsg('');
     try {
-      const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+      const clientId =
+        process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+        Constants.expoConfig?.extra?.googleClientId ||
+        '230211236022-a4vh6il2mkot1i0nng1tl17dtbat2b3b.apps.googleusercontent.com';
       if (!clientId) {
         Toast.show({
           type: 'info',

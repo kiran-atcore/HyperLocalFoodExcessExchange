@@ -7,6 +7,15 @@
     "icon": "./assets/images/resq-logo.jpg",
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/transparent-splash.png",
+      "backgroundColor": "#042F2E",
+      "resizeMode": "contain",
+      "dark": {
+        "image": "./assets/images/transparent-splash.png",
+        "backgroundColor": "#042F2E"
+      }
+    },
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -16,6 +25,15 @@
         "foregroundImage": "./assets/images/resq-logo.jpg",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "splash": {
+        "image": "./assets/images/transparent-splash.png",
+        "backgroundColor": "#042F2E",
+        "resizeMode": "contain",
+        "dark": {
+          "image": "./assets/images/transparent-splash.png",
+          "backgroundColor": "#042F2E"
+        }
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.ki4kirra.mobile"
@@ -29,9 +47,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#042F2E",
+          "image": "./assets/images/transparent-splash.png",
+          "dark": {
+            "backgroundColor": "#042F2E",
+            "image": "./assets/images/transparent-splash.png"
+          }
         }
       ],
       "expo-secure-store",
@@ -53,7 +74,8 @@
       "router": {},
       "eas": {
         "projectId": "cec2f86a-c4e4-438c-ab9b-ee7b0f51eb81"
-      }
+      },
+      "googleClientId": "230211236022-a4vh6il2mkot1i0nng1tl17dtbat2b3b.apps.googleusercontent.com"
     }
   }
 }
